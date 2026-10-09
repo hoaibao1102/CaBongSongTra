@@ -1,5 +1,6 @@
 import { AdminCard, EmptyState } from "../../admin-shell";
 import {
+  approveCommissionAction,
   createPayoutAction,
   recordPaymentAction,
   upsertOrderCostAction,
@@ -9,6 +10,14 @@ import {
   hasSupabaseEnv,
 } from "@/lib/p0a/supabase-server";
 import { translateStatus } from "@/lib/p0a/vi";
+
+async function approveCommission(formData: FormData) {
+  "use server";
+  await approveCommissionAction(
+    String(formData.get("commissionRecordId")),
+    crypto.randomUUID(),
+  );
+}
 
 export default async function FinancePage() {
   const supabase = hasSupabaseEnv() ? await createSupabaseServerClient() : null;
@@ -32,6 +41,25 @@ export default async function FinancePage() {
           .limit(20)
       ).data
     : null;
+  const orders = supabase
+    ? ((
+        await supabase
+          .from("orders")
+          .select("id,order_code")
+          .order("created_at", { ascending: false })
+          .limit(100)
+      ).data ?? [])
+    : [];
+  const members = supabase
+    ? ((
+        await supabase
+          .from("profiles")
+          .select("id,display_name")
+          .eq("role", "MEMBER")
+          .eq("active", true)
+          .order("display_name")
+      ).data ?? [])
+    : [];
   return (
     <>
       <div className="p0a-page-head">
@@ -52,8 +80,15 @@ export default async function FinancePage() {
       <AdminCard title="Ghi nhận thu tiền hoặc hoàn tiền">
         <form action={recordPaymentAction} className="p0a-form">
           <label>
-            Mã định danh đơn hàng
-            <input name="orderId" required />
+            Đơn hàng
+            <select name="orderId" required>
+              <option value="">-- Chọn đơn hàng --</option>
+              {orders.map((order) => (
+                <option key={order.id} value={order.id}>
+                  {order.order_code}
+                </option>
+              ))}
+            </select>
           </label>
           <label>
             Loại giao dịch
@@ -88,8 +123,15 @@ export default async function FinancePage() {
       <AdminCard title="Chi phí trực tiếp của đơn hàng">
         <form action={upsertOrderCostAction} className="p0a-form">
           <label>
-            Mã định danh đơn hàng
-            <input name="orderId" required />
+            Đơn hàng
+            <select name="orderId" required>
+              <option value="">-- Chọn đơn hàng --</option>
+              {orders.map((order) => (
+                <option key={order.id} value={order.id}>
+                  {order.order_code}
+                </option>
+              ))}
+            </select>
           </label>
           <label>
             Loại chi phí
@@ -137,6 +179,7 @@ export default async function FinancePage() {
                 <th>Lợi nhuận tính chia</th>
                 <th>Thành viên</th>
                 <th>Chủ sở hữu</th>
+                <th>Thao tác</th>
               </tr>
             </thead>
             <tbody>
@@ -147,6 +190,20 @@ export default async function FinancePage() {
                   <td>{Number(c.base_profit).toLocaleString("vi-VN")}đ</td>
                   <td>{Number(c.member_amount).toLocaleString("vi-VN")}đ</td>
                   <td>{Number(c.owner_amount).toLocaleString("vi-VN")}đ</td>
+                  <td>
+                    {c.status === "ELIGIBLE" ? (
+                      <form action={approveCommission}>
+                        <input
+                          type="hidden"
+                          name="commissionRecordId"
+                          value={c.id}
+                        />
+                        <button type="submit">Duyệt hoa hồng</button>
+                      </form>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -156,8 +213,15 @@ export default async function FinancePage() {
       <AdminCard title="Tạo đợt chi trả hàng tháng">
         <form action={createPayoutAction} className="p0a-form">
           <label>
-            Mã thành viên
-            <input name="memberId" required />
+            Thành viên
+            <select name="memberId" required>
+              <option value="">-- Chọn thành viên --</option>
+              {members.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.display_name}
+                </option>
+              ))}
+            </select>
           </label>
           <label>
             Từ ngày

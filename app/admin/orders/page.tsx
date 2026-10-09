@@ -9,7 +9,7 @@ import {
   createSupabaseServerClient,
   hasSupabaseEnv,
 } from "@/lib/p0a/supabase-server";
-import { translateStatus } from "@/lib/p0a/vi";
+import { getNextOrderStatuses, translateStatus } from "@/lib/p0a/vi";
 
 async function confirm(formData: FormData) {
   "use server";
@@ -134,64 +134,69 @@ export default async function OrdersPage() {
               </tr>
             </thead>
             <tbody>
-              {orders.map((o) => (
-                <tr key={o.id}>
-                  <td>{o.order_code}</td>
-                  <td>
-                    {
-                      (o.customers as { display_name?: string } | null)
-                        ?.display_name
-                    }
-                  </td>
-                  <td>{translateStatus(o.status)}</td>
-                  <td>{translateStatus(o.payment_status)}</td>
-                  <td>{Number(o.gross_due).toLocaleString("vi-VN")}đ</td>
-                  <td>
-                    <form
-                      action={o.status === "DRAFT" ? confirm : transition}
-                      className="p0a-form"
-                    >
-                      <input type="hidden" name="orderId" value={o.id} />
-                      <input type="hidden" name="version" value={o.version} />
-                      {o.status !== "DRAFT" ? (
-                        <select name="to" defaultValue="PREPARING">
-                          <option value="PREPARING">Đang chuẩn bị</option>
-                          <option value="SHIPPING">Đang giao</option>
-                          <option value="DELIVERED">Đã giao</option>
-                          <option value="CANCELLED">Hủy đơn</option>
-                          <option value="RETURN_REQUESTED">
-                            Yêu cầu hoàn hàng
-                          </option>
-                        </select>
-                      ) : null}
-                      <input name="reason" placeholder="Lý do" />
-                      <button type="submit">Áp dụng</button>
-                    </form>
-                    {o.status === "RETURN_REQUESTED" ? (
-                      <form action={processReturnAction} className="p0a-form">
+              {orders.map((o) => {
+                const nextStatuses = getNextOrderStatuses(o.status);
+                return (
+                  <tr key={o.id}>
+                    <td>{o.order_code}</td>
+                    <td>
+                      {
+                        (o.customers as { display_name?: string } | null)
+                          ?.display_name
+                      }
+                    </td>
+                    <td>{translateStatus(o.status)}</td>
+                    <td>{translateStatus(o.payment_status)}</td>
+                    <td>{Number(o.gross_due).toLocaleString("vi-VN")}đ</td>
+                    <td>
+                      <form
+                        action={o.status === "DRAFT" ? confirm : transition}
+                        className="p0a-form"
+                      >
                         <input type="hidden" name="orderId" value={o.id} />
-                        <input
-                          type="hidden"
-                          name="idempotencyKey"
-                          value={crypto.randomUUID()}
-                        />
-                        <input
-                          name="refundAmount"
-                          type="number"
-                          min="0"
-                          defaultValue="0"
-                        />
-                        <input
-                          name="reason"
-                          placeholder="Lý do hoàn"
-                          required
-                        />
-                        <button type="submit">Xử lý hoàn</button>
+                        <input type="hidden" name="version" value={o.version} />
+                        {o.status !== "DRAFT" && nextStatuses.length ? (
+                          <select name="to" defaultValue={nextStatuses[0]}>
+                            {nextStatuses.map((status) => (
+                              <option key={status} value={status}>
+                                {translateStatus(status)}
+                              </option>
+                            ))}
+                          </select>
+                        ) : null}
+                        <input name="reason" placeholder="Lý do" />
+                        {o.status === "DRAFT" || nextStatuses.length ? (
+                          <button type="submit">
+                            {o.status === "DRAFT" ? "Xác nhận đơn" : "Áp dụng"}
+                          </button>
+                        ) : null}
                       </form>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
+                      {o.status === "RETURN_REQUESTED" ? (
+                        <form action={processReturnAction} className="p0a-form">
+                          <input type="hidden" name="orderId" value={o.id} />
+                          <input
+                            type="hidden"
+                            name="idempotencyKey"
+                            value={crypto.randomUUID()}
+                          />
+                          <input
+                            name="refundAmount"
+                            type="number"
+                            min="0"
+                            defaultValue="0"
+                          />
+                          <input
+                            name="reason"
+                            placeholder="Lý do hoàn"
+                            required
+                          />
+                          <button type="submit">Xử lý hoàn</button>
+                        </form>
+                      ) : null}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </AdminCard>

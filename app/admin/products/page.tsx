@@ -1,7 +1,7 @@
 import { AdminCard, EmptyState } from "../../admin-shell";
 import { canonicalProducts } from "@/lib/p0a/catalog";
 import { createPriceVersionAction } from "@/lib/p0a/actions";
-import { translateStatus } from "@/lib/p0a/vi";
+import { findCurrentPrice, translateStatus } from "@/lib/p0a/vi";
 import {
   createSupabaseServerClient,
   hasSupabaseEnv,
@@ -59,22 +59,41 @@ export default async function ProductsPage() {
         />
       ) : (
         <AdminCard title="Sản phẩm đang quản lý">
-          <table className="p0a-table">
-            <tbody>
-              {products.map((p) => (
-                <tr key={p.id}>
-                  <td>{p.sku}</td>
-                  <td>{p.name}</td>
-                  <td>{p.label_net_weight_g}g</td>
-                  <td>
-                    <span className="p0a-pill">
-                      {translateStatus(p.status)}
-                    </span>
-                  </td>
+          <div className="p0a-table-wrap">
+            <table className="p0a-table">
+              <thead>
+                <tr>
+                  <th>SKU</th>
+                  <th>Tên sản phẩm</th>
+                  <th>Khối lượng</th>
+                  <th>Giá đang áp dụng</th>
+                  <th>Trạng thái</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {products.map((p) => {
+                  const currentPrice = findCurrentPrice(p.product_prices);
+                  return (
+                    <tr key={p.id}>
+                      <td>{p.sku}</td>
+                      <td>{p.name}</td>
+                      <td>{p.label_net_weight_g}g</td>
+                      <td>
+                        {currentPrice
+                          ? `${Number(currentPrice.retail_price).toLocaleString("vi-VN")}đ`
+                          : "Chưa có giá"}
+                      </td>
+                      <td>
+                        <span className="p0a-pill">
+                          {translateStatus(p.status)}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </AdminCard>
       )}
       <AdminCard title="Tạo phiên bản giá mới">

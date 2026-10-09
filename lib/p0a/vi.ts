@@ -18,11 +18,16 @@ const statusLabels: Record<string, string> = {
   PARTIALLY_PAID: "Thanh toán một phần",
   PAID: "Đã thanh toán",
   OVERPAID: "Thanh toán dư",
+  PARTIALLY_REFUNDED: "Hoàn tiền một phần",
   REFUNDED: "Đã hoàn tiền",
+  PARTIALLY_RETURNED: "Hoàn hàng một phần",
   ESTIMATED: "Tạm tính",
   ELIGIBLE: "Đủ điều kiện",
   APPROVED: "Đã duyệt",
+  ADJUSTED: "Đã điều chỉnh",
+  REVERSED: "Đã thu hồi",
   PAID_OUT: "Đã chi trả",
+  VOID: "Đã hủy hiệu lực",
   VOIDED: "Đã hủy hiệu lực",
   PENDING: "Đang chờ",
 };
@@ -69,4 +74,47 @@ export function translateAuditAction(value: string | null | undefined) {
 export function translateEntity(value: string | null | undefined) {
   if (!value) return "—";
   return entityLabels[value] ?? value;
+}
+
+const nextOrderStatuses: Record<string, readonly string[]> = {
+  DRAFT: [],
+  CONFIRMED: ["PREPARING", "CANCELLED"],
+  PREPARING: ["SHIPPING"],
+  SHIPPING: ["DELIVERED", "RETURN_REQUESTED"],
+  DELIVERED: ["RETURN_REQUESTED"],
+  CANCELLED: [],
+  RETURN_REQUESTED: [],
+  PARTIALLY_RETURNED: [],
+  RETURNED: [],
+};
+
+export function getNextOrderStatuses(status: string | null | undefined) {
+  if (!status) return [];
+  return [...(nextOrderStatuses[status] ?? [])];
+}
+
+export type PriceVersion = {
+  retail_price: number;
+  effective_from: string;
+  effective_to: string | null;
+};
+
+export function findCurrentPrice(
+  prices: PriceVersion[] | null | undefined,
+  now = new Date(),
+) {
+  const nowMs = now.getTime();
+  return [...(prices ?? [])]
+    .filter((price) => {
+      const startsAt = new Date(price.effective_from).getTime();
+      const endsAt = price.effective_to
+        ? new Date(price.effective_to).getTime()
+        : Number.POSITIVE_INFINITY;
+      return startsAt <= nowMs && nowMs < endsAt;
+    })
+    .sort(
+      (a, b) =>
+        new Date(b.effective_from).getTime() -
+        new Date(a.effective_from).getTime(),
+    )[0];
 }

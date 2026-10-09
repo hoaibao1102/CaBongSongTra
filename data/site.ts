@@ -1,3 +1,5 @@
+const zaloPhone = process.env.NEXT_PUBLIC_ZALO_PHONE?.trim() || "0702478561";
+
 export const site = {
   name: "Cá Bống Sông Trà",
   fullName: "Cá Bống Sông Trà – Đặc sản Quảng Ngãi",
@@ -8,13 +10,15 @@ export const site = {
     "Cá bống Sông Trà kho đậm đà, gợi nhớ hương vị Quảng Ngãi. Sản phẩm có hàng tại TP.HCM; khách liên hệ qua Zalo để được tư vấn lựa chọn hũ phù hợp và xác nhận phương án giao hàng.",
   description:
     "Khám phá cá bống Sông Trà Quảng Ngãi đóng hũ, 3 quy cách 300 g, 400 g và 600 g. Xem giá, thông tin sản phẩm và liên hệ đặt mua qua Zalo tại TP.HCM.",
-  region: "TP. Thủ Đức (ưu tiên khu vực Quận 9 cũ), nhận giao các khu vực khác tại TP.HCM tùy đơn thực tế",
+  region:
+    "TP. Thủ Đức (ưu tiên khu vực Quận 9 cũ), nhận giao các khu vực khác tại TP.HCM tùy đơn thực tế",
   contactName: "Hoài Bảo",
-  zaloPhone: process.env.NEXT_PUBLIC_ZALO_PHONE?.trim() || "0702478561",
-  zaloDirectLink: "https://zalo.me/0702478561",
-  zaloQrLink: "https://zalo.me/0702478561",
+  zaloPhone,
+  zaloDirectLink: `https://zalo.me/${zaloPhone}`,
+  zaloQrLink: `https://zalo.me/${zaloPhone}`,
   zaloQrImage: "/images/zalo-qr.png",
-  siteUrl: process.env.NEXT_PUBLIC_SITE_URL || "https://example.vercel.app",
+  siteUrl:
+    process.env.NEXT_PUBLIC_SITE_URL || "https://ca-bong-song-tra.vercel.app",
 };
 
 export type Product = {
