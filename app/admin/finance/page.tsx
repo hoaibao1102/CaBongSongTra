@@ -47,7 +47,7 @@ export default async function FinancePage() {
           .from("orders")
           .select("id,order_code")
           .order("created_at", { ascending: false })
-          .limit(100)
+          .limit(500)
       ).data ?? [])
     : [];
   const members = supabase
@@ -56,7 +56,6 @@ export default async function FinancePage() {
           .from("profiles")
           .select("id,display_name")
           .eq("role", "MEMBER")
-          .eq("active", true)
           .order("display_name")
       ).data ?? [])
     : [];
