@@ -1,14 +1,20 @@
 # THÔNG TIN SẢN PHẨM — CÁ BỐNG SÔNG TRÀ QUẢNG NGÃI
 
-> **Phiên bản:** 1.0 — 09/10/2026  
-> **Mục đích:** Nguồn nội dung để xây landing page/website giới thiệu sản phẩm và tư vấn khách hàng tại TP.HCM.  
+> **Phiên bản:** 1.1 — 09/10/2026
+>
+> **Phân loại tài liệu:** `MIXED`; chỉ các đoạn đánh dấu ✅ mới là nguồn public. Mục 🔒 không được import, render hoặc đưa vào client bundle.
+>
+> **Mục đích:** Nguồn nội dung để xây landing page/website giới thiệu sản phẩm và tư vấn khách hàng tại TP.HCM.
+>
 > **Quy ước:** ✅ Có thể công bố dựa trên dữ liệu kinh doanh hiện có · ⚠️ Cần đối chiếu nhãn/nhà sản xuất trước khi công bố · 🔒 Chỉ dùng nội bộ.
+>
+> **Gate tồn kho:** Không dùng cụm “có hàng sẵn” nếu chưa có kiểm kê vật lý; dùng “phục vụ khách tại TP.HCM, liên hệ để xác nhận tồn”.
 
 ## 1. Giới thiệu thương hiệu và sản phẩm ✅
 
 **Tên hiển thị:** Cá Bống Sông Trà – Đặc sản Quảng Ngãi  
 **Thông điệp:** Hương vị quê nhà, tiện cho bữa cơm gia đình.  
-**Giới thiệu ngắn (đề xuất):** Cá bống Sông Trà kho đậm đà, gợi nhớ hương vị Quảng Ngãi. Sản phẩm có hàng tại TP.HCM; khách liên hệ qua Zalo để được tư vấn lựa chọn hũ phù hợp và xác nhận phương án giao hàng.
+**Giới thiệu ngắn (đề xuất):** Cá bống Sông Trà kho đậm đà, gợi nhớ hương vị Quảng Ngãi. Phục vụ khách tại TP.HCM; khách liên hệ qua Zalo để xác nhận tình trạng hàng, lựa chọn hũ phù hợp và phương án giao hàng.
 
 **Định vị:** Giá hợp lý, có hàng tại TP.HCM, thuận tiện tìm hiểu và đặt mua; không tuyên bố 'rẻ nhất', 'ngon nhất', 'chuẩn 100%' nếu chưa có cơ sở chứng minh.
 
@@ -78,7 +84,7 @@ Quy cách 600 g. Lựa chọn dung lượng lớn hơn khi khách có nhu cầu 
 ### 4.1. Mô tả ngắn (hero)
 
 **Cá Bống Sông Trà Quảng Ngãi — đậm đà hương vị quê nhà.**  
-Khám phá 3 lựa chọn hũ nhỏ, vừa và lớn. Có hàng tại TP.HCM, dễ dàng liên hệ tư vấn và đặt mua qua Zalo.
+Khám phá 3 lựa chọn hũ nhỏ, vừa và lớn. Phục vụ khách tại TP.HCM; liên hệ Zalo để xác nhận tồn và phương án giao.
 
 ### 4.2. Mô tả chi tiết
 
@@ -102,8 +108,9 @@ Hiện có 3 quy cách: hũ nhỏ 300 g, hũ vừa 400 g và hũ lớn 600 g (th
 **2. Giá bao nhiêu?**  
 Hũ nhỏ 109.000đ, hũ vừa 139.000đ và hũ lớn 199.000đ. Phí giao hàng (nếu có) được báo riêng.
 
-**3. Có hàng ở TP.HCM không?**  
-Có hàng phục vụ khách tại TP.HCM; ưu tiên khu vực TP Thủ Đức. Vui lòng liên hệ Zalo để xác nhận tồn kho và thời gian giao của từng đơn.
+**3. Shop có phục vụ khách tại TP.HCM không?**
+
+Có phục vụ khách tại TP.HCM, ưu tiên khu vực TP Thủ Đức. Tình trạng hàng không được mặc định từ kế hoạch nhập; vui lòng liên hệ Zalo để xác nhận tồn thực tế và thời gian giao của từng đơn.
 
 **4. Bảo quản như thế nào?**  
 Theo thông tin bảo quản ghi trên nhãn sản phẩm. Bạn có thể nhắn Zalo để nhận ảnh nhãn và hướng dẫn cụ thể.
@@ -178,7 +185,7 @@ Chính sách đổi/trả cần được công bố riêng sau khi thống nhấ
 - [ ] Có câu trả lời chính thức về nhiệt độ, hạn bảo quản khi chưa mở và sau mở.
 - [ ] Chỉ công bố ngày sản xuất/hạn sử dụng theo từng lô thực tế.
 - [ ] Thay ảnh minh họa bằng ảnh thật, đúng loại hũ.
-- [ ] Gắn số Zalo và thử nút liên hệ trên điện thoại.
+- [ ] Owner xác nhận số Zalo chính thức; cấu hình một nguồn duy nhất và thử mọi nút/QR trên điện thoại.
 - [ ] Xác nhận bảng giá và phí giao rõ ràng.
 - [ ] Viết chính sách giải quyết hàng hư hỏng, giao nhầm và thông tin liên hệ thực.
 - [ ] Không đăng lời cam kết chưa chứng minh được (không chất bảo quản, bảo quản nhiệt độ phòng 1 tháng, hàng chính gốc 100%, tiêu chuẩn chứng nhận...).
