@@ -47,7 +47,7 @@ export default function Home() {
             <h1 className="hero-title">
               Cá Bống Sông Trà
               <span className="hero-subline">
-                — Hương vị Quảng Ngãi trong <em>bữa cơm nhà.</em>
+                - Hương vị Quảng Ngãi trong <em>bữa cơm nhà.</em>
               </span>
             </h1>
 
