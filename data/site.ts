@@ -37,7 +37,7 @@ export const products: Product[] = [
   {
     id: "nho",
     code: "CBST-300",
-    name: "Cá bống Sông Trà - Hũ nhỏ",
+    name: " Hũ nhỏ",
     shortName: "Hũ nhỏ 300g",
     netWeight: "300 g",
     grossWeightEstimate: "Khối lượng chuẩn: 300 g",
@@ -53,7 +53,7 @@ export const products: Product[] = [
   {
     id: "vua",
     code: "CBST-400",
-    name: "Cá bống Sông Trà - Hũ vừa",
+    name: " Hũ vừa",
     shortName: "Hũ vừa 400g",
     netWeight: "400 g",
     grossWeightEstimate: "Khối lượng chuẩn: 400 g",
@@ -70,7 +70,7 @@ export const products: Product[] = [
   {
     id: "lon",
     code: "CBST-600",
-    name: "Cá bống Sông Trà - Hũ lớn",
+    name: "Hũ lớn",
     shortName: "Hũ lớn 600g",
     netWeight: "600 g",
     grossWeightEstimate: "Khối lượng chuẩn: 600 g",
