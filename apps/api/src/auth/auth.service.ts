@@ -1,9 +1,10 @@
 import { createHmac } from "node:crypto";
-import type { Role } from "@cbst/contracts";
+import type { Role } from "../domain";
 import { createSessionToken } from "./session-token";
 import { verifyPassword } from "./password";
 
 export type StoredUser = {
+  authVersion?: number;
   id: string;
   emailNormalized: string;
   displayName: string;
@@ -13,6 +14,7 @@ export type StoredUser = {
 };
 
 export type StoredSession = {
+  authVersion?: number;
   tokenHash: string;
   userId: string;
   idleExpiresAt: Date;
@@ -55,9 +57,11 @@ export class AuthService {
       throw new Error("INVALID_CREDENTIALS");
     }
     const token = createSessionToken();
+    if (user.role === "OWNER_ADMIN" && process.env.NODE_ENV === "production") throw new Error("OWNER_MFA_REQUIRED");
     await this.repository.createSession({
       tokenHash: this.tokenHash(token),
       userId: user.id,
+      authVersion: user.authVersion ?? 0,
       idleExpiresAt: new Date(now.getTime() + IDLE_MS),
       absoluteExpiresAt: new Date(now.getTime() + ABSOLUTE_MS),
       revokedAt: null,
@@ -77,11 +81,15 @@ export class AuthService {
       throw new Error("SESSION_INVALID");
     }
     const user = await this.repository.findUserById(session.userId);
-    if (!user || user.status !== "ACTIVE") {
+    if (!user || user.status !== "ACTIVE" || (user.authVersion ?? 0) !== (session.authVersion ?? 0)) {
       await this.repository.revokeSession(tokenHash);
       throw new Error("SESSION_INVALID");
     }
     const nextIdle = new Date(Math.min(now.getTime() + IDLE_MS, session.absoluteExpiresAt.getTime()));
+    if (user.role === "OWNER_ADMIN" && process.env.NODE_ENV === "production") {
+      await this.repository.revokeSession(tokenHash);
+      throw new Error("OWNER_MFA_REQUIRED");
+    }
     await this.repository.touchSession(tokenHash, nextIdle);
     return this.profile(user);
   }

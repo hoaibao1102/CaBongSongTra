@@ -1,4 +1,4 @@
-import { selectReservationBatches, type OrderStatus } from "@cbst/contracts";
+import { selectReservationBatches, type OrderStatus } from "../domain";
 
 export type OrderAggregate = {
   id: string;

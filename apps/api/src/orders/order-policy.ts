@@ -1,4 +1,4 @@
-import { isOrderTransitionAllowed, type OrderStatus, type Role } from "@cbst/contracts";
+import { isOrderTransitionAllowed, type OrderStatus, type Role } from "../domain";
 
 type Actor = { id: string; role: Role };
 type ScopedOrder = { responsibleMemberId: string; version: number };

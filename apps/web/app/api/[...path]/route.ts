@@ -1,3 +1,17 @@
-import { NextRequest, NextResponse } from "next/server";
-async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) { const { path } = await context.params; const base = process.env.API_INTERNAL_URL; if (!base) return NextResponse.json({ error: { code: "API_NOT_CONFIGURED", message: "API_INTERNAL_URL is missing" } }, { status: 503 }); const target = `${base}/${path.join("/")}${request.nextUrl.search}`; const headers = new Headers(request.headers); headers.delete("host"); const response = await fetch(target, { method: request.method, headers, body: ["GET","HEAD"].includes(request.method) ? undefined : await request.arrayBuffer(), redirect: "manual", cache: "no-store" }); return new NextResponse(response.body, { status: response.status, headers: response.headers }); }
-export const GET=proxy; export const POST=proxy; export const PATCH=proxy; export const DELETE=proxy;
+import { proxy } from "../../../lib/bff";
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+async function handler(
+  request: Request,
+  context: { params: Promise<{ path: string[] }> },
+) {
+  return proxy(request, (await context.params).path, {
+    apiUrl: process.env.API_INTERNAL_URL,
+    webOrigin: process.env.WEB_ORIGIN,
+    sharedSecret: process.env.BFF_SHARED_SECRET,
+  });
+}
+export const GET = handler;
+export const POST = handler;
+export const PATCH = handler;
+export const DELETE = handler;
