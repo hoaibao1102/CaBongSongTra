@@ -1,0 +1,3 @@
+import { Schema } from "mongoose";
+export const OrderSchema = new Schema({ id: { type: String, required: true, unique: true }, orderCode: { type: String, required: true }, customerId: { type: String }, responsibleMemberId: { type: String, required: true, index: true }, status: { type: String, required: true, default: "PENDING" }, paymentStatus: { type: String, required: true, default: "UNPAID" }, items: { type: [Schema.Types.Mixed], required: true }, totals: { type: Schema.Types.Mixed, required: true } }, { timestamps: true, optimisticConcurrency: true, versionKey: "version" });
+OrderSchema.index({ orderCode: 1 }, { unique: true });
