@@ -70,7 +70,7 @@ export class AuthService {
       throw new Error("INVALID_CREDENTIALS");
     }
     const token = createSessionToken();
-    if (user.role === "OWNER_ADMIN" && process.env.NODE_ENV === "production") throw new Error("OWNER_MFA_REQUIRED");
+    if (user.role === "OWNER_ADMIN" && process.env.OWNER_MFA_ENABLED === "true") throw new Error("OWNER_MFA_REQUIRED");
     await this.repository.createSession({
       tokenHash: this.tokenHash(token),
       userId: user.id,
@@ -99,7 +99,7 @@ export class AuthService {
       throw new Error("SESSION_INVALID");
     }
     const nextIdle = new Date(Math.min(now.getTime() + IDLE_MS, session.absoluteExpiresAt.getTime()));
-    if (user.role === "OWNER_ADMIN" && process.env.NODE_ENV === "production") {
+    if (user.role === "OWNER_ADMIN" && process.env.OWNER_MFA_ENABLED === "true") {
       await this.repository.revokeSession(tokenHash);
       throw new Error("OWNER_MFA_REQUIRED");
     }
