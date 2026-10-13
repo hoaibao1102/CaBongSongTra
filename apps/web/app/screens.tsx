@@ -337,92 +337,35 @@ export function ActionForm({
   );
 }
 
+/** Matches BE MediaAsset schema (models.ts) */
 export interface MediaItem {
   id: string;
   url: string;
   title: string;
   tag: string;
   description?: string;
+  /** Cloudinary public_id — populated after upload */
+  publicId?: string;
+  width?: number;
+  height?: number;
+  format?: string;
+  bytes?: number;
   createdAt: string;
+  updatedAt?: string;
 }
 
-export const DEFAULT_PRODUCT_IMAGES: Record<string, string> = {
-  "hero-banner": "/images/products/group-3-sizes.jpg",
-  "CBST-300": "/images/gia-size-nho.png",
-  "CBST-400": "/images/gia-size-vua.png",
-  "CBST-600": "/images/gia-size-lon.png",
-  "group-3": "/images/products/group-3-sizes.jpg",
-  "bang-size": "/images/bang-size.png",
-  "bang-gia": "/images/bang-gia.png",
-  "zalo-qr": "/images/zalo-qr.png",
-};
+/**
+ * No hardcoded local-path fallbacks.
+ * All image URLs must come from the BE (MongoDB mediaSlots via /api/media).
+ * Keeping the export so referencing code compiles; it returns an empty map.
+ */
+export const DEFAULT_PRODUCT_IMAGES: Record<string, string> = {};
 
-export const INITIAL_MEDIA_ITEMS: MediaItem[] = [
-  {
-    id: "media-banner",
-    url: "/images/products/group-3-sizes.jpg",
-    title: "Ảnh Banner chính Hero (3 hũ)",
-    tag: "hero-banner",
-    description: "Ảnh xuất hiện ngay đầu trang Landing Page bên cạnh lời chào",
-    createdAt: "2026-10-11",
-  },
-  {
-    id: "media-300",
-    url: "/images/gia-size-nho.png",
-    title: "Hũ nhỏ 300g (Kèm giá)",
-    tag: "CBST-300",
-    description: "Ảnh chụp thực tế hũ 300g kèm giá niêm yết",
-    createdAt: "2026-10-11",
-  },
-  {
-    id: "media-400",
-    url: "/images/gia-size-vua.png",
-    title: "Hũ vừa 400g (Kèm giá)",
-    tag: "CBST-400",
-    description: "Ảnh chụp thực tế hũ 400g phổ biến nhất cho gia đình",
-    createdAt: "2026-10-11",
-  },
-  {
-    id: "media-600",
-    url: "/images/gia-size-lon.png",
-    title: "Hũ lớn 600g (Kèm giá)",
-    tag: "CBST-600",
-    description: "Ảnh chụp thực tế hũ 600g quà biếu sang trọng",
-    createdAt: "2026-10-11",
-  },
-  {
-    id: "media-group",
-    url: "/images/products/group-3-sizes.jpg",
-    title: "Bộ 3 hũ thực tế",
-    tag: "group-3",
-    description: "Ảnh chụp cận cảnh bộ 3 hũ cá bống Sông Trà trên mâm cơm",
-    createdAt: "2026-10-11",
-  },
-  {
-    id: "media-size",
-    url: "/images/bang-size.png",
-    title: "Bảng quy cách & kích thước",
-    tag: "bang-size",
-    description: "Bảng so sánh chiều cao, đường kính và khẩu phần 3 size hũ",
-    createdAt: "2026-10-11",
-  },
-  {
-    id: "media-price",
-    url: "/images/bang-gia.png",
-    title: "Bảng giá niêm yết 3 hũ",
-    tag: "bang-gia",
-    description: "Bảng giá chính thức đồng bộ toàn hệ thống cửa hàng",
-    createdAt: "2026-10-11",
-  },
-  {
-    id: "media-qr",
-    url: "/images/zalo-qr.png",
-    title: "Mã QR Zalo Hoài Bảo",
-    tag: "zalo-qr",
-    description: "Mã QR kết nối trực tiếp Zalo tư vấn 070 2478 561",
-    createdAt: "2026-10-11",
-  },
-];
+/**
+ * Gallery is seeded from BE (GET /api/media → gallery[]).
+ * No hardcoded local paths — start empty so stale local data never masks BE data.
+ */
+export const INITIAL_MEDIA_ITEMS: MediaItem[] = [];
 
 export const MEDIA_SLOTS = [
   { key: "hero-banner", labelVi: "Banner chính đầu trang (Hero)", labelEn: "Hero Main Banner", descVi: "Ảnh lớn xuất hiện ngay đầu trang bên cạnh lời chào và nút đặt mua", descEn: "Large prominent image at the top hero section of the landing page" },
@@ -478,54 +421,47 @@ export function Storefront({
   const [lightboxImg, setLightboxImg] = useState<string | null>(null);
 
   // Dynamic Product & Landing Page Image Repository State
+  // Source of truth: BE mediaSlots (fetched via /api/media).
+  // initialImages (SSR-injected) takes priority; localStorage is a read-through cache.
   const [productImages, setProductImages] = useState<Record<string, string>>(() => {
     if (initialImages && Object.keys(initialImages).length > 0) {
-      return { ...DEFAULT_PRODUCT_IMAGES, ...initialImages };
+      return { ...initialImages };
     }
     if (typeof window !== "undefined") {
       try {
         const saved = localStorage.getItem("cbst_product_images");
-        if (saved) return { ...DEFAULT_PRODUCT_IMAGES, ...JSON.parse(saved) };
+        if (saved) return JSON.parse(saved);
       } catch {
         /* ignore */
       }
     }
-    return DEFAULT_PRODUCT_IMAGES;
+    return {};
   });
 
   useEffect(() => {
-    const handleUpdate = () => {
-      try {
-        const saved = localStorage.getItem("cbst_product_images");
-        if (saved) {
-          setProductImages({ ...DEFAULT_PRODUCT_IMAGES, ...JSON.parse(saved) });
-        }
-      } catch {
-        /* ignore */
-      }
-    };
-
-    handleUpdate();
-
+    // Refresh from BE first — BE is authoritative, localStorage is just a cache.
     fetch("/api/media")
       .then((res) => res.json())
       .then((resData) => {
         if (resData?.success && resData?.images && Object.keys(resData.images).length > 0) {
           setProductImages((prev) => ({ ...prev, ...resData.images }));
           try {
-            const localSaved = localStorage.getItem("cbst_product_images");
-            const merged = {
-              ...DEFAULT_PRODUCT_IMAGES,
-              ...(localSaved ? JSON.parse(localSaved) : {}),
-              ...resData.images,
-            };
-            localStorage.setItem("cbst_product_images", JSON.stringify(merged));
+            localStorage.setItem("cbst_product_images", JSON.stringify(resData.images));
           } catch {
             /* ignore */
           }
         }
       })
       .catch(() => {});
+
+    const handleUpdate = () => {
+      try {
+        const saved = localStorage.getItem("cbst_product_images");
+        if (saved) setProductImages(JSON.parse(saved));
+      } catch {
+        /* ignore */
+      }
+    };
 
     window.addEventListener("cbst_images_updated", handleUpdate);
     window.addEventListener("storage", handleUpdate);
@@ -4133,19 +4069,19 @@ export function MediaManager({ lang }: { lang: Lang }) {
         /* ignore */
       }
     }
-    return INITIAL_MEDIA_ITEMS;
+    return INITIAL_MEDIA_ITEMS; // [] — seeded from BE on mount
   });
 
   const [assignedMap, setAssignedMap] = useState<Record<string, string>>(() => {
     if (typeof window !== "undefined") {
       try {
         const saved = localStorage.getItem("cbst_product_images");
-        if (saved) return { ...DEFAULT_PRODUCT_IMAGES, ...JSON.parse(saved) };
+        if (saved) return JSON.parse(saved);
       } catch {
         /* ignore */
       }
     }
-    return DEFAULT_PRODUCT_IMAGES;
+    return {}; // seeded from BE on mount
   });
 
   const [cloudName, setCloudName] = useState<string>(() => {
@@ -4177,19 +4113,18 @@ export function MediaManager({ lang }: { lang: Lang }) {
       .then((resData) => {
         if (resData?.success) {
           if (resData.images && Object.keys(resData.images).length > 0) {
-            setAssignedMap((prev) => ({ ...prev, ...resData.images }));
+            // BE is authoritative — overwrite local cache entirely
+            setAssignedMap(resData.images);
             try {
-              localStorage.setItem(
-                "cbst_product_images",
-                JSON.stringify({ ...DEFAULT_PRODUCT_IMAGES, ...resData.images }),
-              );
+              localStorage.setItem("cbst_product_images", JSON.stringify(resData.images));
             } catch {
               /* ignore */
             }
           }
           if (resData.gallery && resData.gallery.length > 0) {
+            // BE gallery wins — merge with any locally-created items not yet persisted
             setGallery((prev) => {
-              const ids = new Set(resData.gallery.map((g: MediaItem) => g.id));
+              const ids = new Set<string>(resData.gallery.map((g: MediaItem) => g.id));
               return [...resData.gallery, ...prev.filter((p) => !ids.has(p.id))];
             });
             try {
@@ -4269,12 +4204,13 @@ export function MediaManager({ lang }: { lang: Lang }) {
   };
 
   const handleResetSlot = (slotKey: string) => {
-    const defaultUrl = DEFAULT_PRODUCT_IMAGES[slotKey] || "";
-    const next = { ...assignedMap, [slotKey]: defaultUrl };
+    // Remove the slot assignment — leave it empty so the UI shows a placeholder
+    const next = { ...assignedMap };
+    delete next[slotKey];
     saveAssigned(next);
     setNotice({
       type: "success",
-      msg: text(lang, "Đã khôi phục ảnh gốc mặc định cho vị trí này.", "Reverted slot to default photo."),
+      msg: text(lang, "Đã xóa ảnh khỏi vị trí này.", "Slot image removed."),
     });
   };
 
@@ -4284,18 +4220,18 @@ export function MediaManager({ lang }: { lang: Lang }) {
       !window.confirm(
         text(
           lang,
-          "Bạn có chắc chắn muốn đặt lại tất cả ảnh và bể chứa về dữ liệu gốc ban đầu?",
-          "Are you sure you want to restore all images and slots to defaults?",
+          "Bạn có chắc chắn muốn xóa toàn bộ ảnh đã gán và bể chứa?",
+          "Are you sure you want to clear all assigned images and the media pool?",
         ),
       )
     ) {
       return;
     }
-    saveAssigned(DEFAULT_PRODUCT_IMAGES);
-    saveGallery(INITIAL_MEDIA_ITEMS);
+    saveAssigned({});
+    saveGallery([]);
     setNotice({
       type: "success",
-      msg: text(lang, "Đã khôi phục toàn bộ bể chứa và ảnh về mặc định.", "Restored all media to defaults."),
+      msg: text(lang, "Đã xóa toàn bộ ảnh đã gán và bể chứa.", "Cleared all media."),
     });
   };
 
@@ -4336,13 +4272,14 @@ export function MediaManager({ lang }: { lang: Lang }) {
           throw new Error(text(lang, "Vui lòng chọn 1 tệp ảnh để tải lên.", "Please select an image file to upload."));
         }
 
-        const formData = new FormData();
-        formData.append("file", fileData);
-
+        // fileData is a base64 data-URL string from FileReader.readAsDataURL.
+        // The upload route's JSON path accepts { file: "data:image/...;base64,..." }
+        // directly. Using FormData here would send a plain string (not a Blob) which
+        // fails the route's `file instanceof Blob` check → INVALID_IMAGE.
         const res = await fetch("/api/upload", {
           method: "POST",
-          headers: cloudName ? { "x-cloudinary-cloud-name": cloudName } : {},
-          body: formData,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ file: fileData }),
         });
 
         const cdnData = await res.json().catch(() => ({}));
@@ -4357,17 +4294,33 @@ export function MediaManager({ lang }: { lang: Lang }) {
         throw new Error(text(lang, "Vui lòng cung cấp URL ảnh hoặc tải tệp lên.", "Please provide an image URL or upload a file."));
       }
 
+      const now = new Date().toISOString();
       const newItem: MediaItem = {
         id: `media-${Date.now()}`,
         url: finalUrl,
         title: newTitle.trim() || text(lang, "Ảnh tải lên", "Uploaded Image"),
         tag: newTag,
         description: newDesc.trim(),
-        createdAt: new Date().toISOString().slice(0, 10),
+        createdAt: now.slice(0, 10),
+        updatedAt: now,
       };
 
+      // Persist MediaAsset to BE immediately (aligns with BE MediaAsset schema)
+      await fetch("/api/media", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gallery: [newItem],
+          // Also assign slot if requested so mediaSlots is updated in the same call
+          ...(assignTarget && assignTarget !== "none"
+            ? { images: { ...assignedMap, [assignTarget]: finalUrl } }
+            : {}),
+        }),
+      }).catch(() => {});
+
       const nextGallery = [newItem, ...gallery];
-      saveGallery(nextGallery);
+      setGallery(nextGallery);
+      try { localStorage.setItem("cbst_media_gallery", JSON.stringify(nextGallery)); } catch { /* ignore */ }
 
       if (assignTarget && assignTarget !== "none") {
         handleAssign(assignTarget, finalUrl);
