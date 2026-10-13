@@ -13,11 +13,15 @@ async function bootstrap() {
   app.setGlobalPrefix("api/v1");
   app.use(helmet());
   app.use(cookieParser());
+  const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? "http://localhost:3000")
+    .split(",")
+    .map((value) => value.trim().replace(/\/+$/, ""))
+    .filter(Boolean);
+  if (!allowedOrigins.includes("https://ca-bong-song-tra.vercel.app")) {
+    allowedOrigins.push("https://ca-bong-song-tra.vercel.app");
+  }
   app.enableCors({
-    origin: (process.env.CORS_ALLOWED_ORIGINS ?? "http://localhost:3000")
-      .split(",")
-      .map((value) => value.trim().replace(/\/+$/, ""))
-      .filter(Boolean),
+    origin: allowedOrigins,
     credentials: true,
   });
   app.useGlobalPipes(
