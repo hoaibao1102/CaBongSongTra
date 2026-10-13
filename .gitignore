@@ -1,10 +1,13 @@
 node_modules/
 .pnpm-store/
 .next/
+.next-qc/
 dist/
 coverage/
+*.tsbuildinfo
+.vercel/
+
+# Environment files
 .env
 .env.*
 !.env.example
-*.tsbuildinfo
-.vercel/
