@@ -5,10 +5,16 @@ async function handler(
   request: Request,
   context: { params: Promise<{ path: string[] }> },
 ) {
-  const reqOrigin = new URL(request.url).origin;
+  const reqOrigin = new URL(request.url).origin.replace(/\/+$/, "");
+  const originHeader = request.headers.get("origin")?.trim().replace(/\/+$/, "");
+  const configuredOrigin = process.env.WEB_ORIGIN?.trim().replace(/\/+$/, "");
+  const webOrigin =
+    originHeader && originHeader === reqOrigin
+      ? reqOrigin
+      : (configuredOrigin || reqOrigin);
   return proxy(request, (await context.params).path, {
     apiUrl: process.env.API_INTERNAL_URL,
-    webOrigin: process.env.WEB_ORIGIN || reqOrigin,
+    webOrigin,
     sharedSecret: process.env.BFF_SHARED_SECRET,
   });
 }

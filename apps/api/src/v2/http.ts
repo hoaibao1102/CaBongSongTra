@@ -71,7 +71,15 @@ export class ApiGuard implements CanActivate {
         .split(",")
         .map(value => value.trim().replace(/\/+$/, ""))
         .filter(Boolean);
-      if (!reqOrigin || (!allowed.includes(reqOrigin) && !allowed.includes("*")))
+      const isAllowed =
+        allowed.includes("*") ||
+        Boolean(
+          reqOrigin && (
+            reqOrigin === "https://ca-bong-song-tra.vercel.app" ||
+            allowed.some(a => reqOrigin === a || reqOrigin === `https://${a}` || reqOrigin === `http://${a}`)
+          ),
+        );
+      if (!reqOrigin || !isAllowed)
         throw new ForbiddenException("ORIGIN_REJECTED");
       if (!request.is("application/json")) throw new BadRequestException("JSON_REQUIRED");
     }

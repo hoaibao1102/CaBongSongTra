@@ -10,7 +10,14 @@ async function bootstrap() {
   app.setGlobalPrefix("api/v1");
   app.use(helmet());
   app.use(cookieParser());
-  app.enableCors({ origin: (process.env.CORS_ALLOWED_ORIGINS ?? "http://localhost:3000").split(",").map(value => value.trim().replace(/\/+$/, "")).filter(Boolean), credentials: true });
+  const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? "http://localhost:3000")
+    .split(",")
+    .map((value) => value.trim().replace(/\/+$/, ""))
+    .filter(Boolean);
+  if (!allowedOrigins.includes("https://ca-bong-song-tra.vercel.app")) {
+    allowedOrigins.push("https://ca-bong-song-tra.vercel.app");
+  }
+  app.enableCors({ origin: allowedOrigins, credentials: true });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, forbidUnknownValues: true, transform: true, transformOptions: { enableImplicitConversion: false } }));
   if (process.env.NODE_ENV !== "production") {
     const swagger = new DocumentBuilder().setTitle("Cá Bống Sông Trà API").setVersion("2.0").addCookieAuth("cbst_session").build();
