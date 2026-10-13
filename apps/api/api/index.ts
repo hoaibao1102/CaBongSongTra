@@ -14,9 +14,9 @@ async function bootstrap() {
   app.use(helmet());
   app.use(cookieParser());
   app.enableCors({
-    origin: (process.env.CORS_ALLOWED_ORIGINS ?? "")
+    origin: (process.env.CORS_ALLOWED_ORIGINS ?? "http://localhost:3000")
       .split(",")
-      .map((value) => value.trim())
+      .map((value) => value.trim().replace(/\/+$/, ""))
       .filter(Boolean),
     credentials: true,
   });
