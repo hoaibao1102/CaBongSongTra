@@ -1,0 +1,3 @@
+import { Schema } from "mongoose";
+export const InventoryBatchSchema = new Schema({ id: { type: String, required: true, unique: true }, sku: { type: String, required: true }, lotCode: { type: String, required: true }, receivedQty: { type: Number, required: true, min: 0 }, onHandQty: { type: Number, required: true, min: 0 }, reservedQty: { type: Number, required: true, min: 0 }, landedUnitCostVnd: { type: Number, required: true, min: 0 }, expiresAt: { type: Date, default: null }, receivedAt: { type: Date, required: true }, status: { type: String, required: true }, labelEvidencePath: { type: String, default: null } }, { timestamps: true });
+InventoryBatchSchema.index({ sku: 1, expiresAt: 1, receivedAt: 1 });

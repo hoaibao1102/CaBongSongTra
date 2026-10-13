@@ -1,7 +1,10 @@
-.next/
 node_modules/
-out/
-.env*
+.pnpm-store/
+.next/
+dist/
+coverage/
+.env
+.env.*
 !.env.example
 *.tsbuildinfo
-.DS_Store
+.vercel/
