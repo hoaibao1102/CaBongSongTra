@@ -66,8 +66,13 @@ export class ApiGuard implements CanActivate {
     context.switchToHttp().getResponse<Response>().setHeader("Cache-Control", "no-store");
     const publicRoute = this.reflector.getAllAndOverride<boolean>("public", [context.getHandler(), context.getClass()]);
     if (!["GET", "HEAD", "OPTIONS"].includes(request.method)) {
-      const allowed = (process.env.CORS_ALLOWED_ORIGINS ?? "").split(",").map(value => value.trim()).filter(Boolean);
-      if (!request.get("Origin") || !allowed.includes(request.get("Origin")!)) throw new ForbiddenException("ORIGIN_REJECTED");
+      const reqOrigin = request.get("Origin")?.trim().replace(/\/+$/, "");
+      const allowed = (process.env.CORS_ALLOWED_ORIGINS ?? "")
+        .split(",")
+        .map(value => value.trim().replace(/\/+$/, ""))
+        .filter(Boolean);
+      if (!reqOrigin || (!allowed.includes(reqOrigin) && !allowed.includes("*")))
+        throw new ForbiddenException("ORIGIN_REJECTED");
       if (!request.is("application/json")) throw new BadRequestException("JSON_REQUIRED");
     }
     if (publicRoute) {

@@ -6,8 +6,11 @@ export const dynamic = "force-dynamic";
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 
 function rejectUnsafeMutation(request: Request) {
-  const webOrigin = process.env.WEB_ORIGIN;
-  if (!webOrigin || request.headers.get("origin") !== webOrigin || request.headers.get("sec-fetch-site") === "cross-site")
+  const urlOrigin = new URL(request.url).origin.replace(/\/+$/, "");
+  const configuredOrigin = process.env.WEB_ORIGIN?.trim().replace(/\/+$/, "");
+  const reqOrigin = (request.headers.get("origin") || "").trim().replace(/\/+$/, "");
+  const isOriginMatch = Boolean(reqOrigin && (reqOrigin === urlOrigin || (configuredOrigin && reqOrigin === configuredOrigin)));
+  if (!isOriginMatch || request.headers.get("sec-fetch-site") === "cross-site")
     return NextResponse.json({ error: "ORIGIN_REJECTED" }, { status: 403 });
   const length = Number(request.headers.get("content-length") ?? 0);
   if (Number.isFinite(length) && length > MAX_UPLOAD_BYTES)

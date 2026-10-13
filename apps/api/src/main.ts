@@ -10,7 +10,7 @@ async function bootstrap() {
   app.setGlobalPrefix("api/v1");
   app.use(helmet());
   app.use(cookieParser());
-  app.enableCors({ origin: (process.env.CORS_ALLOWED_ORIGINS ?? "").split(",").map(value => value.trim()).filter(Boolean), credentials: true });
+  app.enableCors({ origin: (process.env.CORS_ALLOWED_ORIGINS ?? "http://localhost:3000").split(",").map(value => value.trim().replace(/\/+$/, "")).filter(Boolean), credentials: true });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, forbidUnknownValues: true, transform: true, transformOptions: { enableImplicitConversion: false } }));
   if (process.env.NODE_ENV !== "production") {
     const swagger = new DocumentBuilder().setTitle("Cá Bống Sông Trà API").setVersion("2.0").addCookieAuth("cbst_session").build();
