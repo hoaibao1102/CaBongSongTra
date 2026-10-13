@@ -1,17 +1,81 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import type { ClientSession } from "mongoose";
 import { isOrderTransitionAllowed } from "../domain";
 import { hashPassword } from "../auth/password";
 import { MongoRepository } from "./repository";
+import { computePricing, returnCredit, safeQuote } from "./pricing";
+import { DiscountsService } from "./discounts";
 import { commissionTarget, orderProjection, orderScope, paymentDue, type Actor } from "./policy";
-import type { AdjustmentDto, CheckoutDto, CreateUserDto, ExpenseDto, PaymentDto, ProductDto, ReceiptDto, RefundDto, TransitionDto } from "./dto";
-import type { Batch, Ledger, Order } from "./models";
+import type { AdjustmentDto, CheckoutDto, CreateUserDto, ExpenseDto, PaymentDto, ProductDto, ReceiptDto, RefundDto, TransitionDto, CreatePurchaseReceiptDto, UpdateCommissionRateDto, UpdateBankInfoDto } from "./dto";
+import type { Batch, Ledger, Order, Product, PurchaseReceipt, PurchaseReceiptItem } from "./models";
+import type { InternalCheckoutDto, InternalQuoteDto, PublicQuoteDto } from "./dto";
 import type { AssignOrderDto, CreateProductDto, EditOrderDto, ReturnDto } from "./dto";
+
+export function allocateReceiptShipping<T extends { sku: string; qty: number; purchasePriceVnd: number }>(
+  items: T[],
+  shippingFeeVnd: number,
+) {
+  const lineTotals = items.map(item => item.qty * item.purchasePriceVnd);
+  const subtotalVnd = lineTotals.reduce((sum, val) => sum + val, 0);
+  if (subtotalVnd === 0 || shippingFeeVnd === 0) {
+    return items.map((item, idx) => ({
+      ...item,
+      lineTotalVnd: lineTotals[idx],
+      allocatedShippingVnd: 0,
+      landedUnitCostVnd: item.purchasePriceVnd,
+    }));
+  }
+  let allocatedSum = 0;
+  const allocations = lineTotals.map(lineTotal => {
+    const share = Math.floor((shippingFeeVnd * lineTotal) / subtotalVnd);
+    allocatedSum += share;
+    return share;
+  });
+  const remainder = shippingFeeVnd - allocatedSum;
+  let maxIdx = 0;
+  let maxVal = lineTotals[0];
+  for (let i = 1; i < lineTotals.length; i++) {
+    if (lineTotals[i] > maxVal) {
+      maxVal = lineTotals[i];
+      maxIdx = i;
+    }
+  }
+  allocations[maxIdx] += remainder;
+  return items.map((item, idx) => {
+    const allocatedShippingVnd = allocations[idx];
+    const unitShipping = Math.floor(allocatedShippingVnd / item.qty);
+    const landedUnitCostVnd = item.purchasePriceVnd + unitShipping;
+    return {
+      ...item,
+      lineTotalVnd: lineTotals[idx],
+      allocatedShippingVnd,
+      landedUnitCostVnd,
+    };
+  });
+}
 
 @Injectable()
 export class CommerceService {
-  constructor(private readonly db: MongoRepository) {}
+  readonly discounts: DiscountsService;
+  constructor(private readonly db: MongoRepository) { this.discounts = new DiscountsService(db); }
+  private async computeQuote(actor: Actor | null, dto: { items: Array<{ sku: string; qty: number }>; voucherCode?: string; customerPhone?: string }, session?: ClientSession) {
+    if (dto.voucherCode !== undefined && !actor) throw new ForbiddenException("AUTH_REQUIRED");
+    const now = new Date();
+    const products = [];
+    for (const item of dto.items) {
+      const product = await this.db.products.findOne({ sku: item.sku, active: true }).session(session ?? null).lean();
+      if (!product) throw new BadRequestException("PRODUCT_UNAVAILABLE");
+      products.push(product);
+    }
+    const promotions = await this.db.promotions.find({ sku: { $in: dto.items.map(item => item.sku) }, active: true, deletedAt: { $exists: false }, startAt: { $lte: now }, endAt: { $gt: now } }).session(session ?? null).lean();
+    const base = computePricing(dto.items, products, [], undefined, now);
+    const voucher = dto.voucherCode === undefined ? undefined : await this.discounts.verifyVoucher(actor, { code: dto.voucherCode, customerPhone: dto.customerPhone ?? "", subtotalVnd: base.merchandiseSubtotalVnd, now }, session);
+    return computePricing(dto.items, products, promotions, voucher, now);
+  }
+  async quote(actor: Actor | null, dto: PublicQuoteDto | InternalQuoteDto, session?: ClientSession) {
+    return safeQuote(await this.computeQuote(actor, dto, session));
+  }
   private owner(actor: Actor) { if (actor.role !== "OWNER_ADMIN") throw new ForbiddenException("OWNER_REQUIRED"); }
   private version(order: Order, expected: number) { if (order.version !== expected) throw new ConflictException("VERSION_CONFLICT"); }
   private async audit(actor: Actor, action: string, entityId: string, requestId: string, session: ClientSession, from?: string, to?: string) {
@@ -33,7 +97,18 @@ export class CommerceService {
     order.commissionVnd = target;
   }
   async products() {
-    return this.db.products.find({ active: true }, { _id: 0, sku: 1, name: 1, netWeightG: 1, retailPriceVnd: 1 }).sort({ netWeightG: 1 }).lean();
+    const products = await this.db.products.find({ active: true }).sort({ netWeightG: 1 }).lean();
+    return this.catalogPrices(products);
+  }
+  private async catalogPrices(products: Product[]) {
+    const now = new Date();
+    const promotions = await this.db.promotions.find({ sku: { $in: products.map(product => product.sku) }, active: true, deletedAt: { $exists: false }, startAt: { $lte: now }, endAt: { $gt: now } }).lean();
+    return products.map(product => {
+      const item = computePricing([{ sku: product.sku, qty: 1 }], [product], promotions, undefined, now).items[0];
+      const promotion = promotions.find(value => value.id === item.discountSourceId);
+      return { sku: product.sku, name: product.name, netWeightG: product.netWeightG, retailPriceVnd: product.retailPriceVnd, effectivePriceVnd: item.finalLineTotalVnd,
+        ...(promotion ? { promotionLabel: promotion.name, promotionEndsAt: promotion.endAt } : {}) };
+    });
   }
   async ownerProducts(actor: Actor) {
     this.owner(actor);
@@ -42,15 +117,21 @@ export class CommerceService {
   async createProduct(actor: Actor, dto: CreateProductDto, key: string, requestId: string) {
     this.owner(actor);
     return this.db.idempotent(`${actor.id}:create-product`, key, dto, async session => {
-      const product = { id: randomUUID(), sku: dto.sku, name: dto.name.trim(), netWeightG: Number(dto.sku.slice(5)), retailPriceVnd: dto.retailPriceVnd, active: dto.active, version: 0 };
+      if (typeof this.db.products.findOne === "function") {
+        const existing = await this.db.products.findOne({ sku: dto.sku }).session(session);
+        if (existing) throw new ConflictException("PRODUCT_ALREADY_EXISTS");
+      }
+      const weightMatch = dto.sku.match(/\d+/);
+      const netWeightG = weightMatch ? parseInt(weightMatch[0], 10) : 0;
+      const product = { id: randomUUID(), sku: dto.sku, name: dto.name.trim(), netWeightG, retailPriceVnd: dto.retailPriceVnd, active: dto.active, version: 0 };
       await this.db.products.create([product], { session });
       await this.audit(actor, "PRODUCT_CREATED", product.id, requestId, session);
       return product;
     });
   }
   async product(sku: string) {
-    const product = await this.db.products.findOne({ sku, active: true }, { _id: 0, sku: 1, name: 1, netWeightG: 1, retailPriceVnd: 1 }).lean();
-    if (!product) throw new NotFoundException("RESOURCE_NOT_FOUND"); return product;
+    const product = await this.db.products.findOne({ sku, active: true }).lean();
+    if (!product) throw new NotFoundException("RESOURCE_NOT_FOUND"); return (await this.catalogPrices([product]))[0];
   }
   async updateProduct(actor: Actor, sku: string, dto: ProductDto, key: string, requestId: string) {
     this.owner(actor);
@@ -60,23 +141,28 @@ export class CommerceService {
       await this.audit(actor, "PRODUCT_UPDATED", sku, requestId, session); return product;
     });
   }
-  async checkout(actor: Actor | null, guestScope: string, dto: CheckoutDto, key: string, requestId: string) {
+  async checkout(actor: Actor | null, guestScope: string, dto: CheckoutDto | InternalCheckoutDto, key: string, requestId: string) {
     if (!actor && process.env.PUBLIC_CHECKOUT_ENABLED !== "true") throw new ServiceUnavailableException("CHECKOUT_DISABLED_PENDING_TRANSACTION_VERIFICATION");
     const effectiveActor: Actor = actor ?? { id: "guest", role: "MEMBER" };
     return this.db.idempotent(`${actor?.id ?? guestScope}:checkout`, key, dto, async session => {
-      const items: Order["items"] = [];
+      const quote = await this.computeQuote(actor, { items: dto.items, ...("voucherCode" in dto ? { voucherCode: dto.voucherCode } : {}), customerPhone: dto.customer.phone }, session);
+      if (dto.clientExpectedTotalVnd !== quote.orderTotalVnd || dto.pricingFingerprint !== quote.pricingFingerprint) throw new ConflictException({ code: "PRICE_STALE_CONFIRMATION_REQUIRED", quote: safeQuote(quote) });
+      const items = quote.items;
       for (const item of dto.items) {
-        const product = await this.db.products.findOne({ sku: item.sku, active: true }).session(session).lean();
-        if (!product) throw new BadRequestException("PRODUCT_UNAVAILABLE");
         const stock = await this.db.batches.aggregate<{ available: number }>([{ $match: { sku: item.sku, status: "AVAILABLE", expiresAt: { $gt: new Date() } } }, { $group: { _id: null, available: { $sum: { $subtract: ["$onHand", "$reserved"] } } } }]).session(session);
         if ((stock[0]?.available ?? 0) < item.qty) throw new ConflictException("OUT_OF_STOCK");
-        items.push({ sku: item.sku, qty: item.qty, unitPriceVnd: product.retailPriceVnd });
       }
       const id = randomUUID();
+      if (quote.voucherId && actor && "voucherCode" in dto) await this.discounts.reserveVoucher(actor, { orderId: id, code: dto.voucherCode!, customerPhone: dto.customer.phone, subtotalVnd: quote.merchandiseSubtotalVnd, now: quote.pricedAt }, session);
+      const responsibleMember = actor?.role === "MEMBER"
+        ? await this.db.users.findOne({ id: actor.id, role: "MEMBER", status: "ACTIVE" }).session(session).lean()
+        : null;
+      if (actor?.role === "MEMBER" && !responsibleMember) throw new BadRequestException("MEMBER_UNAVAILABLE");
       const order: Order = { id, orderCode: `CBST-${id}`, responsibleMemberId: actor?.role === "MEMBER" ? actor.id : null, status: "PENDING", version: 0,
         customer: { ...dto.customer, phone: dto.customer.phone.replace(/^0/, "+84") }, consentAt: new Date(), source: dto.source, notes: dto.notes, items, allocations: [],
-        totalVnd: items.reduce((sum, item) => sum + item.qty * item.unitPriceVnd, 0), receiptsVnd: 0, refundsVnd: 0, cogsVnd: 0, directCostsVnd: 0,
-        costsFinalized: false, commissionRateBps: 4000, commissionVnd: 0, createdAt: new Date() };
+        pricingSchemaVersion: 2, pricingMode: quote.mode, merchandiseSubtotalVnd: quote.merchandiseSubtotalVnd, discountVnd: quote.discountVnd, pricedAt: quote.pricedAt, ...(quote.voucherId ? { voucherId: quote.voucherId } : {}),
+        totalVnd: quote.orderTotalVnd, receiptsVnd: 0, refundsVnd: 0, cogsVnd: 0, directCostsVnd: 0,
+        costsFinalized: false, commissionRateBps: responsibleMember?.commissionRateBps ?? 0, commissionVnd: 0, createdAt: new Date() };
       await this.db.orders.create([order], { session });
       await this.audit(effectiveActor, "ORDER_CREATED", id, requestId, session);
       // Persist only the safe checkout receipt in the replay record, never customer PII.
@@ -84,7 +170,7 @@ export class CommerceService {
     });
   }
   async listOrders(actor: Actor, page: number, limit: number) {
-    const fields = "id orderCode responsibleMemberId status version customer items totalVnd receiptsVnd refundsVnd returnValueVnd returnRefundsVnd createdAt" + (actor.role === "OWNER_ADMIN" ? " cogsVnd directCostsVnd costsFinalized commissionVnd" : "");
+    const fields = "id orderCode responsibleMemberId status version customer items totalVnd receiptsVnd refundsVnd returnValueVnd returnRefundsVnd createdAt pricingSchemaVersion pricingMode merchandiseSubtotalVnd discountVnd pricedAt" + (actor.role === "OWNER_ADMIN" ? " cogsVnd directCostsVnd costsFinalized commissionVnd" : "");
     const orders = await this.db.orders.find(orderScope(actor)).select(fields).sort({ createdAt: -1, id: 1 }).skip(page * limit).limit(limit).lean();
     return orders.map(order => orderProjection(order, actor));
   }
@@ -98,6 +184,7 @@ export class CommerceService {
       if (!member) throw new BadRequestException("MEMBER_UNAVAILABLE");
       const from = order.responsibleMemberId ?? "OWNER_DIRECT";
       order.responsibleMemberId = member.id;
+      order.commissionRateBps = member.commissionRateBps ?? 4000;
       await this.db.saveOrder(order, dto.expectedVersion, session);
       await this.audit(actor, "ORDER_ASSIGNED", id, requestId, session, from, member.id);
       return { id, responsibleMemberId: member.id, version: order.version };
@@ -123,6 +210,7 @@ export class CommerceService {
     await this.db.scopedOrder(id, orderScope(actor));
     return this.db.idempotent(`${actor.id}:edit:${id}`, key, dto, async session => {
       const order = await this.db.scopedOrder(id, orderScope(actor), session); this.version(order, dto.expectedVersion);
+      if (order.pricingSchemaVersion === 2) throw new ConflictException("PRICED_ORDER_EDIT_REQUIRES_RECREATE");
       if (!["PENDING", "CONFIRMED", "PACKING"].includes(order.status) || order.shippedAt) throw new ConflictException("ORDER_LOCKED");
       const items: Order["items"] = [];
       for (const item of dto.items) {
@@ -167,8 +255,9 @@ export class CommerceService {
         } else {
           await this.db.movements.create([{ id: randomUUID(), batchId: line.batchId, sku: allocation.sku, orderId: id, type: "RETURN_DISCARD", reason: dto.reason, qtyDelta: 0, reservedDelta: 0, actorId: actor.id, createdAt: new Date() }], { session });
         }
+        const returnedBefore = order.allocations.filter(value => value.sku === item.sku).reduce((sum, value) => sum + (value.returnedQty ?? 0), 0);
+        credit += returnCredit(order.pricingSchemaVersion, item, returnedBefore, line.qty);
         allocation.returnedQty = (allocation.returnedQty ?? 0) + line.qty;
-        credit += item.unitPriceVnd * line.qty;
       }
       // Reclassify only the overlap with prior goodwill, preserving the original cash entries.
       const overlap = Math.max(0, credit + (order.returnValueVnd ?? 0) + order.refundsVnd - (order.returnRefundsVnd ?? 0) - order.totalVnd);
@@ -200,7 +289,9 @@ export class CommerceService {
       const now = new Date();
       if (dto.status === "CONFIRMED") {
         await this.reserve(order, actor, session, dto.reason);
+        if (order.voucherId) await this.discounts.consumeVoucher(order, session);
       }
+      if (dto.status === "CANCELLED" && !order.shippedAt && order.voucherId) await this.discounts.releaseVoucher(order, session);
       if ((dto.status === "SHIPPING" && !order.shippedAt) || (dto.status === "CANCELLED" && from !== "PENDING")) {
         for (const allocation of order.allocations) {
           const batch = await this.db.batches.findOne({ id: allocation.batchId }).session(session).lean();
@@ -251,6 +342,105 @@ export class CommerceService {
       return { id: entry.id, orderId: id, amountVnd: dto.amountVnd, version: order.version };
     });
   }
+
+  async createPurchaseReceipt(actor: Actor, dto: CreatePurchaseReceiptDto, key: string, requestId: string) {
+    this.owner(actor);
+    return this.db.idempotent(`${actor.id}:purchase-receipt`, key, dto, async session => {
+      const receivedDate = new Date(dto.receivedAt);
+      if (receivedDate > new Date()) throw new BadRequestException("INVALID_RECEIPT_DATE");
+      for (const item of dto.items) {
+        if (item.expiresAt && new Date(item.expiresAt) <= receivedDate) {
+          throw new BadRequestException("INVALID_BATCH_DATES");
+        }
+      }
+      const allocatedItems = allocateReceiptShipping(dto.items, dto.shippingFeeVnd);
+      const subtotalVnd = allocatedItems.reduce((sum, item) => sum + item.lineTotalVnd, 0);
+      const totalCostVnd = subtotalVnd + dto.shippingFeeVnd;
+
+      const receiptId = randomUUID();
+      const codeSuffix = randomBytes(2).toString("hex").toUpperCase();
+      const y = receivedDate.getUTCFullYear();
+      const m = String(receivedDate.getUTCMonth() + 1).padStart(2, "0");
+      const d = String(receivedDate.getUTCDate()).padStart(2, "0");
+      const receiptCode = `PN-${y}${m}${d}-${codeSuffix}`;
+
+      const receiptItems: PurchaseReceiptItem[] = [];
+
+      for (let i = 0; i < allocatedItems.length; i++) {
+        const item = allocatedItems[i];
+        const batchId = randomUUID();
+        const weight = item.sku.replace("CBST-", "");
+        const lotCode = `LOT-${y}${m}${d}-${codeSuffix}-${weight}-${i + 1}`;
+        const expiresAt = item.expiresAt ? new Date(item.expiresAt) : undefined;
+        const status = expiresAt && item.supplierLotCode ? "AVAILABLE" : "QUARANTINED";
+
+        await this.db.batches.create([{
+          id: batchId,
+          sku: item.sku,
+          lotCode,
+          receivedAt: receivedDate,
+          expiresAt,
+          labelReference: item.supplierLotCode,
+          onHand: item.qty,
+          reserved: 0,
+          landedUnitCostVnd: item.landedUnitCostVnd,
+          status,
+          receiptId,
+          receiptCode,
+          supplierLotCode: item.supplierLotCode,
+          purchasePriceVnd: item.purchasePriceVnd,
+          allocatedShippingVnd: item.allocatedShippingVnd,
+        }], { session });
+
+        await this.db.movements.create([{
+          id: randomUUID(),
+          batchId,
+          sku: item.sku,
+          type: "RECEIPT",
+          reason: "GOODS_RECEIVED",
+          qtyDelta: item.qty,
+          reservedDelta: 0,
+          actorId: actor.id,
+          createdAt: new Date(),
+        }], { session });
+
+        receiptItems.push({
+          sku: item.sku,
+          qty: item.qty,
+          purchasePriceVnd: item.purchasePriceVnd,
+          lineTotalVnd: item.lineTotalVnd,
+          allocatedShippingVnd: item.allocatedShippingVnd,
+          landedUnitCostVnd: item.landedUnitCostVnd,
+          batchId,
+          lotCode,
+          supplierLotCode: item.supplierLotCode,
+          expiresAt,
+        });
+      }
+
+      const receiptDoc: PurchaseReceipt = {
+        id: receiptId,
+        receiptCode,
+        receivedAt: receivedDate,
+        shippingFeeVnd: dto.shippingFeeVnd,
+        subtotalVnd,
+        totalCostVnd,
+        items: receiptItems,
+        notes: dto.notes,
+        documentRef: dto.documentRef,
+        actorId: actor.id,
+        createdAt: new Date(),
+      };
+
+      await this.db.purchaseReceipts.create([receiptDoc], { session });
+      await this.audit(actor, "INVENTORY_PURCHASE_RECEIPT", receiptId, requestId, session);
+      return receiptDoc;
+    });
+  }
+  async listPurchaseReceipts(actor: Actor, page: number, limit: number) {
+    this.owner(actor);
+    return this.db.purchaseReceipts.find({}, { _id: 0 }).sort({ receivedAt: -1, createdAt: -1 }).skip(page * limit).limit(limit).lean();
+  }
   async receipt(actor: Actor, dto: ReceiptDto, key: string, requestId: string) {
     this.owner(actor);
     return this.db.idempotent(`${actor.id}:receipt`, key, dto, async session => {
@@ -295,15 +485,44 @@ export class CommerceService {
       await this.audit(actor, "COSTS_FINALIZED", id, requestId, session); return { id, version: order.version };
     });
   }
-  async payout(actor: Actor, memberId: string, reference: string, key: string, requestId: string) {
+  async payout(actor: Actor, memberId: string, reference: string, key: string, requestId: string, amountVnd?: number, period?: string, note?: string) {
     this.owner(actor);
-    return this.db.idempotent(`${actor.id}:payout`, key, { memberId, reference }, async session => {
+    return this.db.idempotent(`${actor.id}:payout`, key, { memberId, reference, amountVnd, period, note }, async session => {
       const balance = await this.db.balances.findOne({ memberId }).session(session).lean();
       if (!balance || balance.balanceVnd <= 0) throw new ConflictException("NO_PAYABLE_COMMISSION");
-      const result = await this.db.balances.updateOne({ memberId, balanceVnd: balance.balanceVnd }, { $set: { balanceVnd: 0 } }, { session });
+      const payAmount = (amountVnd && amountVnd > 0) ? Math.min(amountVnd, balance.balanceVnd) : balance.balanceVnd;
+      if (payAmount <= 0) throw new BadRequestException("INVALID_PAYOUT_AMOUNT");
+      const result = await this.db.balances.updateOne({ memberId, balanceVnd: { $gte: payAmount } }, { $inc: { balanceVnd: -payAmount } }, { session });
       if (result.modifiedCount !== 1) throw new ConflictException("PAYOUT_CONFLICT");
-      const entry = await this.entry(actor, { kind: "PAYOUT", memberId, amountVnd: balance.balanceVnd, reference }, session);
-      await this.audit(actor, "PAYOUT", entry.id, requestId, session); return { id: entry.id, amountVnd: entry.amountVnd, memberId };
+      const entry = await this.entry(actor, { kind: "PAYOUT", memberId, amountVnd: payAmount, reference, reason: note ? `${note}${period ? ` (${period})` : ""}` : period }, session);
+      await this.audit(actor, "PAYOUT", entry.id, requestId, session); return { id: entry.id, amountVnd: entry.amountVnd, memberId, remainingBalanceVnd: balance.balanceVnd - payAmount };
+    });
+  }
+  async updateCommissionRate(actor: Actor, memberId: string, dto: UpdateCommissionRateDto, key: string, requestId: string) {
+    this.owner(actor);
+    return this.db.idempotent(`${actor.id}:commission-rate:${memberId}`, key, dto, async session => {
+      const historyItem = { rateBps: dto.rateBps, changedBy: actor.id, changedAt: new Date(), reason: dto.reason };
+      const user = await this.db.users.findOneAndUpdate(
+        { id: memberId, role: "MEMBER" },
+        { $set: { commissionRateBps: dto.rateBps }, $push: { commissionRateHistory: historyItem } },
+        { session, new: true, projection: { _id: 0, id: 1, displayName: 1, emailNormalized: 1, role: 1, status: 1, commissionRateBps: 1 } }
+      ).lean();
+      if (!user) throw new NotFoundException("MEMBER_NOT_FOUND");
+      await this.audit(actor, "COMMISSION_RATE_UPDATED", memberId, requestId, session);
+      return user;
+    });
+  }
+  async updateBankInfo(actor: Actor, memberId: string, dto: UpdateBankInfoDto, key: string, requestId: string) {
+    if (actor.role !== "OWNER_ADMIN" && actor.id !== memberId) throw new ForbiddenException();
+    return this.db.idempotent(`${actor.id}:bank-info:${memberId}`, key, dto, async session => {
+      const user = await this.db.users.findOneAndUpdate(
+        { id: memberId },
+        { $set: { bankInfo: dto.bankInfo } },
+        { session, new: true, projection: { _id: 0, id: 1, displayName: 1, emailNormalized: 1, role: 1, status: 1, bankInfo: 1 } }
+      ).lean();
+      if (!user) throw new NotFoundException("USER_NOT_FOUND");
+      await this.audit(actor, "BANK_INFO_UPDATED", memberId, requestId, session);
+      return user;
     });
   }
   async createUser(actor: Actor, dto: CreateUserDto, key: string, requestId: string) {
@@ -332,5 +551,110 @@ export class CommerceService {
     const failedDeliveryLossVnd = (losses?.inventoryLossVnd ?? 0) + (losses?.directCostsVnd ?? 0);
     return { asOf: new Date().toISOString(), timezone: "Asia/Ho_Chi_Minh", deliveredOrders: totals?.deliveredOrders ?? 0, revenueVnd: totals?.revenueVnd ?? 0, commissionVnd: totals?.commissionVnd ?? 0, pendingCostOrders: totals?.pendingCostOrders ?? 0,
       ...(actor.role === "OWNER_ADMIN" ? { failedDeliveryLossVnd, failedDeliveryInventoryLossVnd: losses?.inventoryLossVnd ?? 0, failedDeliveryDirectCostsVnd: losses?.directCostsVnd ?? 0, cogsVnd: totals?.cogsVnd ?? 0, directCostsVnd: totals?.directCostsVnd ?? 0, overheadVnd: cash?.overheadVnd ?? 0, operatingCashMovementVnd: cash?.cashMovementVnd ?? 0, netProfitVnd: (totals?.revenueVnd ?? 0) - (totals?.cogsVnd ?? 0) - (totals?.directCostsVnd ?? 0) - (totals?.commissionVnd ?? 0) - (cash?.overheadVnd ?? 0) - failedDeliveryLossVnd } : {}) };
+  }
+  async getMediaState() {
+    const slots = await this.db.mediaSlots.find({}, { _id: 0 }).lean();
+    const assets = await this.db.mediaAssets.find({}, { _id: 0 }).sort({ createdAt: -1 }).lean();
+    const images: Record<string, string> = {};
+    for (const slot of slots) {
+      images[slot.slotKey] = slot.url;
+    }
+    return {
+      success: true,
+      images,
+      gallery: assets.map((a) => ({
+        id: a.id,
+        url: a.url,
+        title: a.title,
+        tag: a.tag,
+        description: a.description || "",
+        createdAt: a.createdAt ? a.createdAt.toISOString().slice(0, 10) : "",
+      })),
+    };
+  }
+  async createMediaAsset(dto: import("./dto").CreateMediaAssetDto, actor?: Actor) {
+    if (actor && actor.role !== "OWNER_ADMIN") throw new ForbiddenException("OWNER_ONLY");
+    const id = randomUUID();
+    const now = new Date();
+    const asset = {
+      id,
+      url: dto.url,
+      title: dto.title,
+      tag: dto.tag,
+      description: dto.description,
+      publicId: dto.publicId,
+      width: dto.width,
+      height: dto.height,
+      format: dto.format,
+      bytes: dto.bytes,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await this.db.mediaAssets.create([asset]);
+    if (dto.assignSlot && dto.assignSlot !== "none") {
+      await this.db.mediaSlots.updateOne(
+        { slotKey: dto.assignSlot },
+        { $set: { url: dto.url, mediaAssetId: id, updatedAt: now } },
+        { upsert: true },
+      );
+    }
+    return { success: true, asset };
+  }
+  async assignMediaSlot(dto: import("./dto").AssignMediaSlotDto, actor?: Actor) {
+    if (actor && actor.role !== "OWNER_ADMIN") throw new ForbiddenException("OWNER_ONLY");
+    const now = new Date();
+    await this.db.mediaSlots.updateOne(
+      { slotKey: dto.slotKey },
+      { $set: { url: dto.url, mediaAssetId: dto.mediaAssetId, updatedAt: now } },
+      { upsert: true },
+    );
+    return { success: true, slotKey: dto.slotKey, url: dto.url };
+  }
+  async bulkSyncMedia(dto: import("./dto").BulkAssignMediaSlotsDto, actor?: Actor) {
+    if (actor && actor.role !== "OWNER_ADMIN") throw new ForbiddenException("OWNER_ONLY");
+    const now = new Date();
+    if (dto.images) {
+      for (const [slotKey, url] of Object.entries(dto.images)) {
+        if (slotKey && url) {
+          await this.db.mediaSlots.updateOne(
+            { slotKey },
+            { $set: { url, updatedAt: now } },
+            { upsert: true },
+          );
+        }
+      }
+    }
+    if (dto.gallery && Array.isArray(dto.gallery)) {
+      for (const raw of dto.gallery) {
+        const item = raw as Record<string, unknown>;
+        if (item && item.url && item.title) {
+          const itemUrl = String(item.url);
+          const itemTag = String(item.tag || "general");
+          const itemTitle = String(item.title);
+          const itemDesc = item.description ? String(item.description) : undefined;
+          const itemId = item.id ? String(item.id) : randomUUID();
+          await this.db.mediaAssets.updateOne(
+            { url: itemUrl },
+            {
+              $setOnInsert: {
+                id: itemId,
+                title: itemTitle,
+                tag: itemTag,
+                description: itemDesc,
+                createdAt: now,
+              },
+              $set: { updatedAt: now },
+            },
+            { upsert: true },
+          );
+        }
+      }
+    }
+    return this.getMediaState();
+  }
+  async deleteMediaAsset(id: string, actor?: Actor) {
+    if (actor && actor.role !== "OWNER_ADMIN") throw new ForbiddenException("OWNER_ONLY");
+    await this.db.mediaAssets.deleteOne({ id });
+    return { success: true, id };
   }
 }

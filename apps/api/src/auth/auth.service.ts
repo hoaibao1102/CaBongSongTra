@@ -11,6 +11,19 @@ export type StoredUser = {
   passwordHash: string;
   role: Role;
   status: "ACTIVE" | "INACTIVE";
+  commissionRateBps?: number;
+  bankInfo?: {
+    bankName?: string;
+    accountNumber?: string;
+    accountHolder?: string;
+    note?: string;
+  };
+  commissionRateHistory?: Array<{
+    rateBps: number;
+    changedBy: string;
+    changedAt: Date;
+    reason?: string;
+  }>;
 };
 
 export type StoredSession = {

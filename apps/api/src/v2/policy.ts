@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { calculateCommission, type Role } from "../domain";
+import type { Order } from "./models";
 export type Actor = { id: string; role: Role; displayName?: string };
 export function orderScope(actor: Actor) { return actor.role === "OWNER_ADMIN" ? {} : { responsibleMemberId: actor.id }; }
 export function fingerprint(value: unknown): string {
@@ -7,7 +8,8 @@ export function fingerprint(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(canonical(value))).digest("hex");
 }
 export type OrderView = {
-  id: string; orderCode?: string; status: string; version: number; customer?: { name: string; phone: string; address: string; area: string }; items: Array<{ sku: string; qty: number; unitPriceVnd: number }>;
+  id: string; orderCode?: string; status: string; version: number; customer?: { name: string; phone: string; address: string; area: string }; items: Order["items"];
+  pricingSchemaVersion?: number; pricingMode?: Order["pricingMode"]; merchandiseSubtotalVnd?: number; discountVnd?: number; pricedAt?: Date;
   totalVnd?: number; receiptsVnd?: number; refundsVnd?: number; responsibleMemberId?: string | null; createdAt?: Date; cogsVnd?: number; directCostsVnd?: number; costsFinalized?: boolean; commissionVnd?: number;
   shippedAt?: Date; deliveredAt?: Date; returnValueVnd?: number; returnRefundsVnd?: number;
   allocations?: Array<{ batchId: string; sku: string; qty: number; returnedQty?: number; landedUnitCostVnd: number }>;
@@ -16,7 +18,9 @@ export function orderProjection(order: OrderView, actor: Actor) {
   return {
     id: order.id, orderCode: order.orderCode, status: order.status, version: order.version,
     customer: order.customer ? { name: order.customer.name, phone: order.customer.phone, address: order.customer.address, area: order.customer.area } : undefined,
-    items: order.items.map(item => ({ sku: item.sku, qty: item.qty, unitPriceVnd: item.unitPriceVnd })),
+    items: order.items.map(item => ({ sku: item.sku, qty: item.qty, unitPriceVnd: item.unitPriceVnd,
+      ...(order.pricingSchemaVersion === 2 ? { retailUnitPriceVnd: item.retailUnitPriceVnd, grossLineTotalVnd: item.grossLineTotalVnd, lineDiscountVnd: item.lineDiscountVnd, finalLineTotalVnd: item.finalLineTotalVnd, discountSourceType: item.discountSourceType, discountLabelSnapshot: item.discountLabelSnapshot } : {}) })),
+    ...(order.pricingSchemaVersion === 2 ? { pricingSchemaVersion: 2, pricingMode: order.pricingMode, merchandiseSubtotalVnd: order.merchandiseSubtotalVnd, discountVnd: order.discountVnd, pricedAt: order.pricedAt } : {}),
     totalVnd: order.totalVnd, receiptsVnd: order.receiptsVnd, refundsVnd: order.refundsVnd, responsibleMemberId: order.responsibleMemberId, createdAt: order.createdAt,
     paymentDueVnd: paymentDue(order),
     ...(actor.role === "OWNER_ADMIN" ? { cogsVnd: order.cogsVnd, directCostsVnd: order.directCostsVnd, costsFinalized: order.costsFinalized, commissionVnd: order.commissionVnd,

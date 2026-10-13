@@ -1,11 +1,17 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { ActionForm, Records, Storefront, Admin, ResetIssue } from "./screens";
+import { ActionForm, Records, Storefront, Admin, ResetIssue, InternalOrderCreator } from "./screens";
 import { actions } from "../lib/commerce";
 import ProductDetail from "./products/[sku]/product-detail";
 
 describe("bilingual usable screens", () => {
+  it("does not fabricate internal catalog prices and exposes voucher verification", () => {
+    const html = renderToStaticMarkup(<InternalOrderCreator actor={{ id: "member", role: "MEMBER" }} lang="en" />);
+    expect(html).not.toContain("109,000");
+    expect(html).toContain('name="voucherCode"');
+    expect(html).toContain("Review price");
+  });
   it("provides product detail loading and safety links without fabricated product data", () => {
     const html = renderToStaticMarkup(<ProductDetail sku="CBST-300" />);
     expect(html).toContain('href="/label-safety"');

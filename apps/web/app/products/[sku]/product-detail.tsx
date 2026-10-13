@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { apiRequest } from "../../../lib/commerce";
 import { errorText, money } from "../../../lib/i18n";
 import type { Product } from "../../../lib/types";
+import { effectivePrice, watchPricing } from "../../../lib/catalog-pricing";
 export default function ProductDetail({ sku }: { sku: string }) {
   const [product, setProduct] = useState<Product | null>(null);
   const [error, setError] = useState<unknown>(null);
@@ -22,6 +23,7 @@ export default function ProductDetail({ sku }: { sku: string }) {
       alive = false;
     };
   }, [sku, revision]);
+  useEffect(() => watchPricing([product?.promotionEndsAt], () => setRevision(v => v + 1)), [product?.promotionEndsAt]);
   return (
     <main>
       <a href="/">Cá Bống Sông Trà / Store</a>
@@ -32,7 +34,7 @@ export default function ProductDetail({ sku }: { sku: string }) {
           <>
             <p lang="en">Song Tra goby · {product.netWeightG}g</p>
             <strong className="total">
-              {money(product.retailPriceVnd, "vi")}
+              {money(effectivePrice(product), "vi")}
             </strong>
             <a className="button" href="/#checkout">
               Chọn số lượng tại cửa hàng / Choose quantity in store

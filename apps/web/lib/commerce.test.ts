@@ -78,7 +78,9 @@ describe("local API contract and forms", () => {
   it("restricts member navigation and return transitions", () => {
     expect(sectionsFor("MEMBER")).toEqual([
       "dashboard",
+      "create-order",
       "orders",
+      "vouchers",
       "commissions",
     ]);
     expect(sectionsFor("OWNER_ADMIN")).toContain("audit");

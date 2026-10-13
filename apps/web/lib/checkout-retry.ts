@@ -1,8 +1,25 @@
-import { apiRequest } from "./commerce";
+import { apiRequest, ApiError } from "./commerce";
 type Store = Pick<Storage, "getItem" | "setItem" | "removeItem">;
-const slot = "cbst-checkout-retry";
-type Retry = { salt: string; fingerprint: string; key: string; guest: string };
-export function createCheckout(store: Store, fetcher: typeof fetch = fetch) {
+type PricingGuard = { clientExpectedTotalVnd: number; pricingFingerprint: string };
+type Retry = { salt: string; fingerprint: string; key: string; guest: string; pricingGuard?: PricingGuard };
+function splitPricingGuard(payload: unknown): { base: unknown; guard?: PricingGuard } {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return { base: payload };
+  const { clientExpectedTotalVnd, pricingFingerprint, ...base } = payload as Record<string, unknown>;
+  const guard = Number.isSafeInteger(clientExpectedTotalVnd) && Number(clientExpectedTotalVnd) >= 0 &&
+    typeof pricingFingerprint === "string" && /^[A-Za-z0-9:_-]{1,256}$/.test(pricingFingerprint)
+    ? { clientExpectedTotalVnd: Number(clientExpectedTotalVnd), pricingFingerprint }
+    : undefined;
+  return guard ? { base, guard } : { base: payload };
+}
+export function clearCheckoutRetry(store: Store, slotName = "cbst-checkout-retry") {
+  try {
+    store.removeItem(slotName);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function createCheckout(store: Store, fetcher: typeof fetch = fetch, slotName = "cbst-checkout-retry") {
   let busy = false;
   return async (payload: unknown, actorId?: string) => {
     if (busy) throw new Error("CHECKOUT_IN_PROGRESS");
@@ -11,7 +28,7 @@ export function createCheckout(store: Store, fetcher: typeof fetch = fetch) {
       let previous: Retry | null;
       let saved: string | null;
       try {
-        const raw = store.getItem(slot);
+        const raw = store.getItem(slotName);
         saved = raw;
         previous = raw ? JSON.parse(raw) : null;
         if (
@@ -21,13 +38,18 @@ export function createCheckout(store: Store, fetcher: typeof fetch = fetch) {
               (value) =>
                 typeof value === "string" &&
                 /^[A-Za-z0-9_-]{32,64}$/.test(value),
-            ))
+            ) ||
+            (previous.pricingGuard !== undefined &&
+              (!Number.isSafeInteger(previous.pricingGuard.clientExpectedTotalVnd) ||
+                previous.pricingGuard.clientExpectedTotalVnd < 0 ||
+                !/^[A-Za-z0-9:_-]{1,256}$/.test(previous.pricingGuard.pricingFingerprint))))
         )
           throw new Error();
       } catch {
         throw new Error("RETRY_STORAGE_UNAVAILABLE");
       }
       const salt = previous?.salt ?? crypto.randomUUID();
+      const submitted = splitPricingGuard(payload);
       const canonical = (value: unknown): unknown =>
         Array.isArray(value)
           ? value.map(canonical)
@@ -41,7 +63,7 @@ export function createCheckout(store: Store, fetcher: typeof fetch = fetch) {
       const bytes = await crypto.subtle.digest(
         "SHA-256",
         new TextEncoder().encode(
-          `${salt}:${actorId ?? "guest"}:${JSON.stringify(canonical(payload))}`,
+          `${salt}:${actorId ?? "guest"}:${JSON.stringify(canonical(submitted.base))}`,
         ),
       );
       const fingerprint = Array.from(new Uint8Array(bytes), (byte) =>
@@ -58,12 +80,16 @@ export function createCheckout(store: Store, fetcher: typeof fetch = fetch) {
               fingerprint,
               key: crypto.randomUUID(),
               guest: crypto.randomUUID().replaceAll("-", ""),
+              ...(submitted.guard ? { pricingGuard: submitted.guard } : {}),
             };
+      const requestPayload = previous?.pricingGuard && payload && typeof payload === "object" && !Array.isArray(payload)
+        ? { ...(payload as Record<string, unknown>), ...previous.pricingGuard }
+        : payload;
       try {
         // Another mounted checkout may have written while hashing was asynchronous.
-        if (store.getItem(slot) !== saved)
+        if (store.getItem(slotName) !== saved)
           throw new Error("CHECKOUT_RECONCILIATION_REQUIRED");
-        store.setItem(slot, JSON.stringify(retry));
+        store.setItem(slotName, JSON.stringify(retry));
       } catch (error) {
         if (
           error instanceof Error &&
@@ -81,14 +107,27 @@ export function createCheckout(store: Store, fetcher: typeof fetch = fetch) {
             "Idempotency-Key": retry.key,
             ...(!actorId ? { "X-Guest-Session": retry.guest } : {}),
           },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(requestPayload),
         },
         fetcher,
-      );
+      ).catch((error: unknown) => {
+        if (
+          error instanceof ApiError &&
+          ((error.status === 409 && error.code === "PRICE_STALE_CONFIRMATION_REQUIRED") ||
+           (error.status >= 400 && error.status < 500 && error.status !== 408 && error.status !== 429))
+        ) {
+          try {
+            if (store.getItem(slotName) === JSON.stringify(retry)) store.removeItem(slotName);
+          } catch {
+            throw new Error("RETRY_STORAGE_UNAVAILABLE");
+          }
+        }
+        throw error;
+      });
       // Do not turn a confirmed success into an ambiguous failure if cleanup is blocked.
       try {
-        if (store.getItem(slot) === JSON.stringify(retry))
-          store.removeItem(slot);
+        if (store.getItem(slotName) === JSON.stringify(retry))
+          store.removeItem(slotName);
       } catch {
         /* Retained key still safely replays the confirmed request. */
       }

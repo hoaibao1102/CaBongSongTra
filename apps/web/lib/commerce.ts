@@ -1,11 +1,13 @@
 import type { OrderStatus, Role } from "./types";
+import { safeQuote, type PricingQuote } from "./pricing";
 export const skus = ["CBST-300", "CBST-400", "CBST-600"];
+export type FieldOption = string | { value: string; label: string };
 export type Field = {
   name: string;
   vi: string;
   en: string;
   type?: string;
-  options?: string[];
+  options?: FieldOption[];
   min?: number;
   max?: number;
   maxLength?: number;
@@ -68,15 +70,19 @@ export const sectionsFor = (role: Role) =>
   role === "OWNER_ADMIN"
     ? [
         "dashboard",
+        "create-order",
         "orders",
         "inventory",
         "users",
         "products",
+        "promotions",
+        "vouchers",
+        "media",
         "expenses",
         "commissions",
         "audit",
       ]
-    : ["dashboard", "orders", "commissions"];
+    : ["dashboard", "create-order", "orders", "vouchers", "commissions"];
 type Action = {
   vi: string;
   en: string;
@@ -242,7 +248,7 @@ export const actions: Record<string, Action> = {
     en: "Pay full available commission",
     path: () => "commissions/payouts",
     fields: [
-      field("memberId", "ID thành viên", "Member ID", uuid),
+      field("memberId", "Thành viên nhận", "Recipient member", uuid),
       field("reference", "Tham chiếu thanh toán", "Payment reference", {
         maxLength: 100,
       }),
@@ -254,7 +260,7 @@ export const actions: Record<string, Action> = {
     path: (id) => `orders/${id}/assignment`,
     fields: [
       version,
-      field("memberId", "ID thành viên", "Member ID", uuid),
+      field("memberId", "Thành viên phụ trách", "Responsible member", uuid),
       reason,
     ],
   },
@@ -351,7 +357,10 @@ export function buildPayload(
         !value ||
         value.length < (f.minLength ?? 1) ||
         value.length > (f.maxLength ?? 1000) ||
-        (f.options && !f.options.includes(value)) ||
+        (f.options &&
+          !f.options
+            .map((opt) => (typeof opt === "object" ? opt.value : opt))
+            .includes(value)) ||
         (f.pattern && !new RegExp(`^${f.pattern}$`).test(value)) ||
         (f.type === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))
       )
@@ -437,6 +446,7 @@ export class ApiError extends Error {
     public code: string,
     public status: number,
     public requestId?: string,
+    public quote?: PricingQuote,
   ) {
     super(code);
   }
@@ -452,8 +462,13 @@ export async function apiRequest<T = unknown>(
     path.includes("//")
   )
     throw new Error("INVALID_API_PATH");
+  const headers = new Headers(init?.headers);
+  if (init?.body && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
   const response = await fetcher(`/api/v1/${path}`, {
     ...init,
+    headers,
     credentials: "same-origin",
     cache: "no-store",
   });
@@ -463,6 +478,8 @@ export async function apiRequest<T = unknown>(
       data?.error?.code ?? "REQUEST_REJECTED",
       response.status,
       data?.error?.requestId,
+      response.status === 409 && data?.error?.code === "PRICE_STALE_CONFIRMATION_REQUIRED"
+        ? safeQuote(data.error.quote) : undefined,
     );
   return data as T;
 }

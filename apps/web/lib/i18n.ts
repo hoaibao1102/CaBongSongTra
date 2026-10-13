@@ -2,6 +2,8 @@ import type { Lang } from "./types";
 export const text = (lang: Lang, vi: string, en: string) =>
   lang === "vi" ? vi : en;
 const labels: Record<string, [string, string]> = {
+  promotions: ["Khuyến mãi", "Promotions"],
+  vouchers: ["Voucher", "Vouchers"],
   paymentDueVnd: ["Còn phải thu", "Payment due"],
   returnValueVnd: ["Giá trị hàng trả", "Return value"],
   returnRefundsVnd: ["Đã hoàn theo hàng trả", "Return refunds"],
@@ -20,6 +22,7 @@ const labels: Record<string, [string, string]> = {
   RESTOCK: ["Nhập lại kho sau kiểm tra", "Restock after inspection"],
   DISCARD: ["Loại bỏ", "Discard"],
   dashboard: ["Tổng quan", "Dashboard"],
+  "create-order": ["Tạo đơn nội bộ", "Create Order"],
   orders: ["Đơn hàng", "Orders"],
   inventory: ["Kho hàng", "Inventory"],
   users: ["Thành viên", "Users"],
@@ -27,6 +30,7 @@ const labels: Record<string, [string, string]> = {
   expenses: ["Chi phí", "Expenses"],
   commissions: ["Hoa hồng", "Commissions"],
   audit: ["Nhật ký", "Audit log"],
+  media: ["Kho hình ảnh", "Media Library"],
   PENDING: ["Chờ xác nhận", "Pending"],
   CONFIRMED: ["Đã xác nhận", "Confirmed"],
   PACKING: ["Đang đóng gói", "Packing"],
@@ -94,7 +98,7 @@ const labels: Record<string, [string, string]> = {
   category: ["Loại chi phí", "Category"],
   reason: ["Lý do", "Reason"],
   kind: ["Loại bút toán", "Entry kind"],
-  memberId: ["ID thành viên", "Member ID"],
+  memberId: ["Thành viên phụ trách", "Responsible member"],
   action: ["Thao tác", "Action"],
   entityId: ["ID đối tượng", "Entity ID"],
   requestId: ["ID yêu cầu", "Request ID"],
@@ -186,6 +190,10 @@ export function errorText(error: unknown, lang: Lang) {
     NO_PAYABLE_COMMISSION: [
       "Thành viên không có hoa hồng khả dụng để chi.",
       "This member has no payable commission.",
+    ],
+    MEMBER_UNAVAILABLE: [
+      "Đơn hàng chỉ được giao cho tài khoản Thành viên / Cộng tác viên (Member) đang hoạt động. Không thể giao đơn cho tài khoản Quản trị viên (Admin).",
+      "Orders can only be assigned to an active Member account. Admin accounts cannot be assigned as sales members.",
     ],
   };
   const message =

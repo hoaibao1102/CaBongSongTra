@@ -8,7 +8,8 @@ import * as schemas from "./models";
 @Injectable()
 export class MongoRepository implements AuthRepository {
   readonly users; readonly sessions; readonly products; readonly orders; readonly batches; readonly movements; readonly ledger; readonly audit; readonly keys; readonly balances; readonly rates;
-  readonly resets;
+  readonly resets; readonly mediaAssets; readonly mediaSlots; readonly purchaseReceipts;
+  readonly promotions; readonly vouchers; readonly voucherRedemptions; readonly voucherCustomerCounters;
   constructor(@InjectConnection() private readonly connection: Connection) {
     this.users = connection.model("V2User", schemas.userSchema, "users");
     this.sessions = connection.model("V2Session", schemas.sessionSchema, "sessions");
@@ -22,6 +23,13 @@ export class MongoRepository implements AuthRepository {
     this.balances = connection.model("V2Balance", schemas.balanceSchema, "commissionBalances");
     this.rates = connection.model("V2Rate", schemas.rateSchema, "rateLimits");
     this.resets = connection.model("V2Reset", schemas.resetSchema, "passwordResetTokens");
+    this.mediaAssets = connection.model("V2MediaAsset", schemas.mediaAssetSchema, "mediaAssets");
+    this.mediaSlots = connection.model("V2MediaSlot", schemas.mediaSlotSchema, "mediaSlots");
+    this.purchaseReceipts = connection.model("V2PurchaseReceipt", schemas.purchaseReceiptSchema, "purchaseReceipts");
+    this.promotions = connection.model("V2Promotion", schemas.promotionSchema, "promotions");
+    this.vouchers = connection.model("V2Voucher", schemas.voucherSchema, "vouchers");
+    this.voucherRedemptions = connection.model("V2VoucherRedemption", schemas.voucherRedemptionSchema, "voucherRedemptions");
+    this.voucherCustomerCounters = connection.model("V2VoucherCustomerCounter", schemas.voucherCustomerCounterSchema, "voucherCustomerCounters");
   }
   async transaction<T>(work: (session: ClientSession) => Promise<T>): Promise<T> {
     const session = await this.connection.startSession();

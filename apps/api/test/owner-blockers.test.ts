@@ -28,7 +28,7 @@ describe("owner catalog", () => {
   it("rejects unknown fields, arbitrary SKUs, fractional prices and string booleans", async () => {
     const good = { sku: "CBST-300", name: "Product", retailPriceVnd: 109000, active: false };
     expect(await validate(plainToInstance(CreateProductDto, good), { whitelist: true, forbidNonWhitelisted: true })).toHaveLength(0);
-    for (const patch of [{ sku: "OTHER" }, { cost: 1 }, { retailPriceVnd: 1.5 }, { active: "true" }, { netWeightG: 600 }]) expect((await validate(plainToInstance(CreateProductDto, { ...good, ...patch }), { whitelist: true, forbidNonWhitelisted: true })).length).toBeGreaterThan(0);
+    for (const patch of [{ sku: "OTHER" }, { sku: "CBST-500" }, { sku: "CBST-XYZ" }, { cost: 1 }, { retailPriceVnd: 1.5 }, { active: "true" }, { netWeightG: 600 }]) expect((await validate(plainToInstance(CreateProductDto, { ...good, ...patch }), { whitelist: true, forbidNonWhitelisted: true })).length).toBeGreaterThan(0);
     expect((await validate(plainToInstance(ProductDto, { expectedVersion: 0, retailPriceVnd: 1, active: true, sku: "CBST-600" }), { whitelist: true, forbidNonWhitelisted: true })).length).toBeGreaterThan(0);
   });
 });
@@ -42,6 +42,20 @@ describe("owner return view", () => {
   });
   it("does not demand a cash refund when an unpaid returned item only cancels receivable", () => {
     expect(commissionTarget({ status: "PARTIALLY_RETURNED", deliveredAt: new Date(), responsibleMemberId: "m", totalVnd: 218000, receiptsVnd: 109000, refundsVnd: 0, returnValueVnd: 109000, returnRefundsVnd: 0, cogsVnd: 65000, directCostsVnd: 0, costsFinalized: true, commissionRateBps: 4000 })).toBe(17600);
+  });
+});
+describe("assignment commission snapshot", () => {
+  it("snapshots the newly assigned member rate", async () => {
+    const order = { id: "order", status: "PENDING", version: 0, responsibleMemberId: null, commissionRateBps: 0 };
+    const query = (value: unknown) => ({ session: () => query(value), lean: async () => value });
+    const db = {
+      scopedOrder: async () => order,
+      idempotent: async (_scope: string, _key: string, _dto: unknown, work: (session: unknown) => unknown) => work("session"),
+      users: { findOne: () => query({ id: "member", role: "MEMBER", status: "ACTIVE", commissionRateBps: 2250 }) },
+      saveOrder: vi.fn(async () => { order.version++; }), audit: { create: vi.fn() },
+    };
+    await new CommerceService(db as never).assignOrder(owner, "order", { memberId: "member", expectedVersion: 0, reason: "Assign" }, "key", "request");
+    expect(order).toMatchObject({ responsibleMemberId: "member", commissionRateBps: 2250 });
   });
 });
 describe("production owner MFA gate", () => {

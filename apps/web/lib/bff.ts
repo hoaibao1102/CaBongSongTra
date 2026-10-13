@@ -1,4 +1,5 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { safeQuote } from "./pricing";
 type Config = {
   apiUrl?: string;
   webOrigin?: string;
@@ -6,8 +7,14 @@ type Config = {
   sharedSecret?: string;
 };
 const routes: [RegExp, string[]][] = [
+  [/^(?:internal\/)?pricing\/quote$/, ["POST"]],
+  [/^(?:promotions|vouchers)$/, ["GET", "POST"]],
+  [/^(?:promotions|vouchers)\/[0-9a-f-]{36}$/, ["PATCH", "DELETE"]],
+  [/^vouchers\/[0-9a-f-]{36}\/(?:redemptions|counters)$/, ["GET"]],
+  [/^vouchers\/verify$/, ["POST"]],
   [/^owner\/products$/, ["GET"]],
-  [/^products(?:\/CBST-(?:300|400|600))?$/, ["GET", "PATCH"]],
+  [/^products$/, ["GET", "POST"]],
+  [/^products\/CBST-[A-Z0-9-]+$/, ["GET", "PATCH"]],
   [/^auth\/(?:login|logout|reset-password)$/, ["POST"]],
   [/^auth\/me$/, ["GET"]],
   [/^checkout\/orders$/, ["POST"]],
@@ -17,10 +24,10 @@ const routes: [RegExp, string[]][] = [
     /^orders\/[0-9a-f-]{36}\/(?:transitions|payments|refunds|finalize-costs|assignment|returns)$/,
     ["POST"],
   ],
-  [/^inventory\/(?:receipts|adjustments)$/, ["POST"]],
-  [/^inventory\/(?:batches|movements)$/, ["GET"]],
+  [/^inventory\/(?:receipts|adjustments|purchase-receipts)$/, ["POST"]],
+  [/^inventory\/(?:batches|movements|purchase-receipts)$/, ["GET"]],
   [/^users$/, ["GET", "POST"]],
-  [/^users\/[0-9a-f-]{36}$/, ["PATCH"]],
+  [/^users\/[0-9a-f-]{36}(?:\/(?:commission-rate|bank-info))?$/, ["PATCH"]],
   [/^users\/[0-9a-f-]{36}\/password-reset$/, ["POST"]],
   [/^expenses$/, ["GET", "POST"]],
   [/^commissions(?:\/me)?$/, ["GET"]],
@@ -151,13 +158,19 @@ export async function proxy(
     createHmac("sha256", config.sharedSecret!)
       .update(`cbst-client-cookie:v1:${client}`)
       .digest("hex");
+  const isHttps = origin.protocol === "https:";
+  const clientCookieName = isHttps ? "__Host-cbst_client" : "cbst_client";
   const candidates = (request.headers.get("cookie") ?? "")
     .split(";")
     .map((value) => value.trim())
-    .filter((value) => value.startsWith("__Host-cbst_client="));
+    .filter(
+      (value) =>
+        value.startsWith("__Host-cbst_client=") ||
+        value.startsWith("cbst_client="),
+    );
   const parts =
     candidates.length === 1
-      ? /^__Host-cbst_client=([A-Za-z0-9_-]{43})\.([a-f0-9]{64})$/.exec(
+      ? /^(?:__Host-)?cbst_client=([A-Za-z0-9_-]{43})\.([a-f0-9]{64})$/.exec(
           candidates[0],
         )
       : null;
@@ -169,7 +182,7 @@ export async function proxy(
     );
   const client = valid ? parts![1] : randomBytes(32).toString("base64url");
   if (!valid)
-    identityCookie = `__Host-cbst_client=${client}.${signCookie(client)}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=2592000`;
+    identityCookie = `${clientCookieName}=${client}.${signCookie(client)}; Path=/; HttpOnly;${isHttps ? " Secure; SameSite=Strict;" : " SameSite=Lax;"} Max-Age=2592000`;
   const timestamp = String(Math.floor(Date.now() / 1000));
   headers.set("X-CBST-Client", client);
   headers.set("X-CBST-Timestamp", timestamp);
@@ -213,9 +226,15 @@ export async function proxy(
       if (value) output.set(name, value);
     }
     const cookies = upstream.headers.getSetCookie();
-    for (const cookie of cookies)
-      if (cookie.startsWith("cbst_session="))
-        output.append("set-cookie", cookie);
+    for (const cookie of cookies) {
+      if (cookie.startsWith("cbst_session=")) {
+        const forwarded =
+          origin.protocol === "http:"
+            ? cookie.replace(/;\s*Secure\b/gi, "").replace(/SameSite=Strict/gi, "SameSite=Lax")
+            : cookie;
+        output.append("set-cookie", forwarded);
+      }
+    }
     const data = await Promise.race([upstream.json(), timeout]);
     if (!upstream.ok) {
       const code =
@@ -232,7 +251,11 @@ export async function proxy(
       )
         return fail(502, "UPSTREAM_ERROR");
       return Response.json(
-        { error: { code, requestId: output.get("x-request-id") ?? undefined } },
+        { error: { code, requestId: output.get("x-request-id") ?? undefined,
+          ...(upstream.status === 409 && code === "PRICE_STALE_CONFIRMATION_REQUIRED" &&
+            request.method === "POST" && ["orders", "checkout/orders"].includes(path)
+            ? { quote: safeQuote(data.error.quote) } : {}),
+        } },
         { status: upstream.status, headers: output },
       );
     }

@@ -6,6 +6,8 @@ export type Product = {
   name: string;
   netWeightG: number;
   retailPriceVnd: number;
+  effectivePriceVnd?: number;
+  promotionEndsAt?: string;
 };
 export type OrderStatus =
   | "PENDING"
@@ -37,6 +39,7 @@ export type Order = {
   orderCode: string;
   status: OrderStatus;
   version: number;
+  responsibleMemberId?: string | null;
   customer: { name: string; phone: string; address: string; area: string };
   items: { sku: string; qty: number; unitPriceVnd: number }[];
   totalVnd: number;
@@ -48,3 +51,62 @@ export type Order = {
   commissionVnd?: number;
 };
 export type RecordRow = Record<string, unknown>;
+
+export type Batch = {
+  id: string;
+  sku: string;
+  lotCode: string;
+  receivedAt: string;
+  expiresAt?: string;
+  labelReference?: string;
+  onHand: number;
+  reserved: number;
+  landedUnitCostVnd: number;
+  status: "AVAILABLE" | "QUARANTINED";
+  receiptCode?: string;
+  supplierLotCode?: string;
+  purchasePriceVnd?: number;
+  allocatedShippingVnd?: number;
+};
+
+export type PurchaseReceiptItem = {
+  sku: string;
+  qty: number;
+  purchasePriceVnd: number;
+  lineTotalVnd: number;
+  allocatedShippingVnd: number;
+  landedUnitCostVnd: number;
+  batchId: string;
+  lotCode: string;
+  supplierLotCode?: string;
+  expiresAt?: string;
+};
+
+export type PurchaseReceipt = {
+  id: string;
+  receiptCode: string;
+  receivedAt: string;
+  shippingFeeVnd: number;
+  subtotalVnd: number;
+  totalCostVnd: number;
+  items: PurchaseReceiptItem[];
+  notes?: string;
+  documentRef?: string;
+  actorId: string;
+  createdAt: string;
+};
+
+export type MemberUser = {
+  id: string;
+  displayName: string;
+  emailNormalized: string;
+  role: Role;
+  status: "ACTIVE" | "INACTIVE";
+  commissionRateBps?: number;
+  bankInfo?: {
+    bankName: string;
+    accountNumber: string;
+    accountHolder: string;
+    note?: string;
+  };
+};

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { proxy } from "./bff";
 import { createHmac } from "node:crypto";
+import { quote } from "./pricing-fixture";
 
 const origin = "https://shop.example";
 const config = {
@@ -17,6 +18,33 @@ const request = (
 ) => new Request(`${origin}/api/v1/${path}`, { method, headers, body });
 afterEach(() => vi.restoreAllMocks());
 describe("same-origin BFF", () => {
+  it("allowlists pricing and promotion/voucher methods with mutation controls", async () => {
+    const id = "12345678-1234-1234-1234-123456789abc";
+    for (const [path, methods] of [
+      ["pricing/quote", ["POST"]], ["internal/pricing/quote", ["POST"]],
+      ["promotions", ["GET", "POST"]], [`promotions/${id}`, ["PATCH", "DELETE"]],
+      ["vouchers", ["GET", "POST"]], [`vouchers/${id}`, ["PATCH", "DELETE"]],
+      [`vouchers/${id}/redemptions`, ["GET"]],
+    ] as const) {
+      for (const method of ["GET", "POST", "PATCH", "DELETE"]) {
+        const fetcher = vi.fn().mockResolvedValue(Response.json([]));
+        const response = await proxy(request(path, method, { origin, "content-type": "application/json", "idempotency-key": "key" }, method === "GET" ? undefined : "{}"), ["v1", ...path.split("/")], config, fetcher);
+        expect(response.status).toBe((methods as readonly string[]).includes(method) ? 200 : 405);
+        if (fetcher.mock.calls.length) expect(new Headers(fetcher.mock.calls[0][1].headers).get("idempotency-key")).toBe("key");
+      }
+      if (methods.includes("POST" as never) || methods.includes("DELETE" as never)) {
+        const method = methods.includes("POST" as never) ? "POST" : "DELETE";
+        expect((await proxy(request(path, method, { "content-type": "application/json" }, "{}"), ["v1", ...path.split("/")], config, vi.fn())).status).toBe(403);
+      }
+    }
+  });
+  it("forwards only safe stale quotes on explicit order price rejection", async () => {
+    const fetcher = vi.fn().mockImplementation(() => Promise.resolve(Response.json({ error: { code: "PRICE_STALE_CONFIRMATION_REQUIRED", quote: { ...quote, voucherCode: "SECRET", reservedCount: 9 }, stack: "SECRET" } }, { status: 409 })));
+    const response = await proxy(request("checkout/orders", "POST", { origin, "content-type": "application/json" }, "{}"), ["v1", "checkout", "orders"], config, fetcher);
+    const data = await response.json();
+    expect(data.error.quote).toEqual(quote);
+    expect(JSON.stringify(data)).not.toContain("SECRET");
+  });
   it("rejects modified and duplicate signed cookies without forwarding them", async () => {
     const fetcher = vi
       .fn()
@@ -290,7 +318,7 @@ describe("same-origin BFF", () => {
         headers: {
           "content-type": "application/json",
           "set-cookie":
-            "cbst_session=abc; Path=/api/v1; HttpOnly; Secure; SameSite=Strict",
+            "cbst_session=abc; Path=/; HttpOnly; Secure; SameSite=Strict",
           "x-secret": "hidden",
           "access-control-allow-origin": "*",
         },
@@ -326,7 +354,7 @@ describe("same-origin BFF", () => {
     expect(headers.get("x-guest-session")).toBe("b".repeat(32));
     expect(init.redirect).toBe("manual");
     expect(init.cache).toBe("no-store");
-    expect(result.headers.get("set-cookie")).toContain("Path=/api/v1");
+    expect(result.headers.get("set-cookie")).toContain("Path=/");
     expect(result.headers.get("cache-control")).toBe("no-store");
     expect(result.headers.get("x-secret")).toBeNull();
     expect(result.headers.get("access-control-allow-origin")).toBeNull();

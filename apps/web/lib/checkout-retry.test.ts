@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createCheckout } from "./checkout-retry";
+import { apiRequest, ApiError } from "./commerce";
+import { quote } from "./pricing-fixture";
 const payload = {
   customer: {
     name: "Private Name",
@@ -22,6 +24,36 @@ function storage() {
   };
 }
 describe("tab-scoped checkout retries", () => {
+  it("transports a sanitized stale quote and releases only explicit stale rejection", async () => {
+    const fetcher = vi.fn().mockImplementation(() => Promise.resolve(Response.json({ error: {
+      code: "PRICE_STALE_CONFIRMATION_REQUIRED", quote: { ...quote, voucherCode: "SECRET" }, requestId: "req-1",
+    } }, { status: 409 })));
+    const error: unknown = await apiRequest("checkout/orders", undefined, fetcher).catch(e => e);
+    expect(error).toBeInstanceOf(ApiError);
+    if (!(error instanceof ApiError)) throw new Error("Expected ApiError");
+    expect(error.quote).toEqual(quote);
+    const store = storage();
+    await createCheckout(store, fetcher)(payload).catch(() => {});
+    expect(store.values.size).toBe(0);
+    fetcher.mockResolvedValue(Response.json({ id: "confirmed" }));
+    await expect(createCheckout(store, fetcher)({ ...payload, clientExpectedTotalVnd: 90, pricingFingerprint: "new" })).resolves.toEqual({ id: "confirmed" });
+  });
+  it("does not release retry identity for stale code on an ambiguous gateway status", async () => {
+    const store = storage();
+    const fetcher = vi.fn().mockResolvedValue(Response.json({ error: { code: "PRICE_STALE_CONFIRMATION_REQUIRED", quote } }, { status: 504 }));
+    await createCheckout(store, fetcher)(payload).catch(() => {});
+    expect(store.values.size).toBe(1);
+    await expect(createCheckout(store, fetcher)({ ...payload, pricingFingerprint: "changed" })).rejects.toThrow("CHECKOUT_RECONCILIATION_REQUIRED");
+  });
+  it("replays the original pricing guard after reload when the same cart receives a new quote", async () => {
+    const store = storage();
+    const fetcher = vi.fn().mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce(Response.json({ id: "original-order" }));
+    const original = { ...payload, clientExpectedTotalVnd: 90, pricingFingerprint: "original" };
+    await createCheckout(store, fetcher)(original).catch(() => {});
+    await expect(createCheckout(store, fetcher)({ ...payload, clientExpectedTotalVnd: 100, pricingFingerprint: "fresh" })).resolves.toEqual({ id: "original-order" });
+    expect(JSON.parse(fetcher.mock.calls[1][1].body)).toMatchObject({ clientExpectedTotalVnd: 90, pricingFingerprint: "original" });
+    expect(fetcher.mock.calls[0][1].headers).toEqual(fetcher.mock.calls[1][1].headers);
+  });
   it("does not let concurrent mounted forms overwrite an unresolved identity during hashing", async () => {
     const store = storage();
     const fetcher = vi.fn().mockRejectedValue(new Error("offline"));

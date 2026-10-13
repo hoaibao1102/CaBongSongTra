@@ -9,7 +9,7 @@ import { FinanceLedger } from "../src/finance/finance-ledger";
 
 const options = { whitelist: true, forbidNonWhitelisted: true, forbidUnknownValues: true };
 describe("V2 input boundary", () => {
-  const checkout = { customer: { name: "Customer", phone: "0912345678", address: "123 Thu Duc", area: "Thu Duc" }, items: [{ sku: "CBST-300", qty: 1 }], consent: true, source: "WEBSITE" };
+  const checkout = { customer: { name: "Customer", phone: "0912345678", address: "123 Thu Duc", area: "Thu Duc" }, items: [{ sku: "CBST-300", qty: 1 }], consent: true, source: "WEBSITE", clientExpectedTotalVnd: 109000, pricingFingerprint: "test-fingerprint" };
   it("accepts a minimal checkout and rejects price/member injection recursively", async () => {
     expect(await validate(plainToInstance(CheckoutDto, checkout), options)).toHaveLength(0);
     for (const input of [{ ...checkout, responsibleMemberId: "other" }, { ...checkout, items: [{ ...checkout.items[0], priceVnd: 1 }] }, { ...checkout, consent: false }]) {
