@@ -54,8 +54,13 @@ export async function proxy(
     );
   let base: URL, origin: URL;
   try {
-    base = new URL(config.apiUrl!);
-    origin = new URL(config.webOrigin!);
+    let rawApiUrl = (config.apiUrl ?? "").trim();
+    if (rawApiUrl && !rawApiUrl.endsWith("/api/v1")) {
+      rawApiUrl = `${rawApiUrl.replace(/\/+$/, "")}/api/v1`;
+    }
+    const rawWebOrigin = (config.webOrigin ?? "").trim().replace(/\/+$/, "");
+    base = new URL(rawApiUrl);
+    origin = new URL(rawWebOrigin);
     if (
       !/^https?:$/.test(base.protocol) ||
       !/^https?:$/.test(origin.protocol) ||
@@ -64,7 +69,7 @@ export async function proxy(
       base.search ||
       base.hash ||
       base.pathname.replace(/\/$/, "") !== "/api/v1" ||
-      config.webOrigin !== origin.origin ||
+      rawWebOrigin !== origin.origin ||
       !config.sharedSecret ||
       config.sharedSecret.length < 32
     )

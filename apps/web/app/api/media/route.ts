@@ -37,8 +37,9 @@ async function readJsonLimited(request: Request, limit = 65536) {
 }
 
 async function requireOwner(request: Request) {
-  const apiUrl = process.env.API_INTERNAL_URL;
+  let apiUrl = (process.env.API_INTERNAL_URL ?? "").trim().replace(/\/+$/, "");
   if (!apiUrl) return NextResponse.json({ error: "API_NOT_CONFIGURED" }, { status: 503 });
+  if (!apiUrl.endsWith("/api/v1")) apiUrl += "/api/v1";
   const session = request.headers.get("cookie")?.split(";").map((value) => value.trim()).find((value) => /^cbst_session=[A-Za-z0-9_-]+$/.test(value));
   if (!session) return NextResponse.json({ error: "SESSION_INVALID" }, { status: 401 });
   try {
