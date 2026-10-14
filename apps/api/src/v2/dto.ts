@@ -69,7 +69,7 @@ export class CreateUserDto extends LoginDto {
 export class UserStatusDto { @IsIn(["ACTIVE", "INACTIVE"]) status!: "ACTIVE" | "INACTIVE"; }
 export class VersionDto { @ApiProperty({ type: Number, minimum: 0, maximum: 2147483647 }) @IsInt() @Min(0) @Max(2147483647) expectedVersion!: number; }
 export class TransitionDto extends VersionDto {
-  @IsIn(["CONFIRMED", "PACKING", "SHIPPING", "DELIVERED", "CANCELLED", "DELIVERY_FAILED", "RETURN_REQUESTED", "PARTIALLY_RETURNED", "RETURNED"]) status!: import("../domain").OrderStatus;
+  @IsIn(["PENDING", "CONFIRMED", "PACKING", "SHIPPING", "DELIVERED", "CANCELLED", "DELIVERY_FAILED", "RETURN_REQUESTED", "PARTIALLY_RETURNED", "RETURNED"]) status!: import("../domain").OrderStatus;
   @IsString() @MinLength(1) @MaxLength(300) reason!: string;
 }
 export class PaymentDto extends VersionDto {

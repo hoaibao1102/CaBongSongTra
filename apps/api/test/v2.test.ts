@@ -39,17 +39,22 @@ describe("V2 ownership and explicit projections", () => {
     const stored = { id: "o", status: "PENDING", version: 0, items: [], customer: { name: "Customer", phone: "+84912345678", address: "Address", area: "Area", internalRiskNote: "secret" } };
     expect(JSON.stringify(orderProjection(stored, { id: "m", role: "MEMBER" }))).not.toContain("secret");
   });
+  it("shows earned commission to the assigned member without exposing costs", () => {
+    const result = orderProjection({ id: "o", status: "DELIVERED", version: 1, items: [], commissionVnd: 51026, cogsVnd: 259434 }, { id: "m", role: "MEMBER" });
+    expect(result.commissionVnd).toBe(51026);
+    expect(result).not.toHaveProperty("cogsVnd");
+  });
   it("canonicalizes object keys but binds idempotency to values and array order", () => {
     expect(fingerprint({ b: 2, a: 1 })).toBe(fingerprint({ a: 1, b: 2 }));
     expect(fingerprint({ a: 1 })).not.toBe(fingerprint({ a: 2 }));
   });
-  it("keeps commission pending until delivery, full settlement and cost approval", () => {
+  it("calculates commission from delivered product margin at the member's rate", () => {
     const order = { status: "DELIVERED", responsibleMemberId: "m", totalVnd: 199000, receiptsVnd: 199000, refundsVnd: 0, cogsVnd: 140000, directCostsVnd: 15000, costsFinalized: true, commissionRateBps: 4000 };
-    expect(commissionTarget(order)).toBe(17600);
-    expect(commissionTarget({ ...order, costsFinalized: false })).toBe(0);
+    expect(commissionTarget(order)).toBe(23600);
+    expect(commissionTarget({ ...order, costsFinalized: false })).toBe(23600);
     expect(commissionTarget({ ...order, status: "SHIPPING" })).toBe(0);
     expect(commissionTarget({ ...order, responsibleMemberId: null })).toBe(0);
-    expect(commissionTarget({ ...order, refundsVnd: 50000 })).toBe(0);
+    expect(commissionTarget({ ...order, refundsVnd: 50000 })).toBe(3600);
   });
 });
 

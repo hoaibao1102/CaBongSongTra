@@ -143,6 +143,14 @@ export function errorText(error: unknown, lang: Lang) {
     );
   const code = error instanceof Error ? error.message : "REQUEST_REJECTED";
   const errors: Record<string, [string, string]> = {
+    INVALID_STATE_TRANSITION: [
+      "Tài khoản này không được chuyển sang trạng thái đã chọn. Hãy nhờ admin điều chỉnh trạng thái.",
+      "Your account cannot make this transition. Ask an admin to correct the status.",
+    ],
+    VOUCHER_STATE_CONFLICT: [
+      "Voucher của đơn đã được giải phóng hoặc không còn hợp lệ để sử dụng lại. Kiểm tra voucher trước khi mở lại đơn.",
+      "The order voucher has been released or cannot be reused. Review the voucher before reopening the order.",
+    ],
     VALIDATION_FAILED: [
       "Vui lòng kiểm tra các trường bắt buộc và giá trị nhập.",
       "Check required fields and entered values.",

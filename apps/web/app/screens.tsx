@@ -1,5 +1,10 @@
 "use client";
 
+import { adminSection, navigate } from "../lib/navigation";
+import { ContactButtons } from "../lib/components/ContactButtons";
+import { LandingImage } from "../lib/components/LandingImage";
+import { MemberCommissions } from "../lib/components/MemberCommissions";
+
 import { useContext, useEffect, useRef, useState, type FormEvent } from "react";
 import {
   useQuery,
@@ -94,7 +99,6 @@ import {
   createMutation,
   sectionsFor,
   skus,
-  transitions,
   type Field,
 } from "../lib/commerce";
 import { errorText, label, money, text } from "../lib/i18n";
@@ -145,7 +149,7 @@ function Input({
     <label className={field.type === "checkbox" ? "check" : ""}>
       <span>
         {title}
-        {field.optional ? text(lang, " (không bắt buộc)", " (optional)") : " *"}
+        {field.optional ? text(lang, " (không bắt buộc)", " (optional)") : <> <span className="required-mark" aria-hidden="true">*</span></>}
       </span>
       {field.options ? (
         <select
@@ -427,14 +431,6 @@ export function Storefront({
     if (initialImages && Object.keys(initialImages).length > 0) {
       return { ...initialImages };
     }
-    if (typeof window !== "undefined") {
-      try {
-        const saved = localStorage.getItem("cbst_product_images");
-        if (saved) return JSON.parse(saved);
-      } catch {
-        /* ignore */
-      }
-    }
     return {};
   });
 
@@ -598,17 +594,6 @@ export function Storefront({
             <a className="button secondary" href="#pricing-compare">
               <span>{text(lang, "Xem bảng giá & kích thước", "View size & price table")}</span>
             </a>
-            <a
-              className="button btn-zalo"
-              href="https://zalo.me/0702478561"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <span>{text(lang, "Nhắn Zalo", "Chat Zalo")}</span>
-            </a>
-            <a className="button secondary btn-call" href="tel:0702478561">
-              <span>{text(lang, "Gọi: 070 2478 561", "Call: 070 2478 561")}</span>
-            </a>
           </div>
           <div className="hero-trust">
             <div className="trust-item">
@@ -626,14 +611,14 @@ export function Storefront({
           </div>
         </div>
         <div className="hero-art" aria-hidden="true">
-          <img
+          <LandingImage
             src={
               productImages["hero-banner"] ||
-              productImages["group-3"] ||
-              "/images/products/group-3-sizes.jpg"
+              productImages["group-3"]
             }
             alt="Cá bống Sông Trà Quảng Ngãi"
             className="hero-art-img"
+            fetchPriority="high"
           />
         </div>
       </section>
@@ -728,16 +713,9 @@ export function Storefront({
         aria-label={text(lang, "Sản phẩm", "Products")}
       >
         {products.map((product) => {
-          const defaultImg =
-            product.netWeightG === 300
-              ? "/images/gia-size-nho.png"
-              : product.netWeightG === 400
-                ? "/images/gia-size-vua.png"
-                : "/images/gia-size-lon.png";
           const imgSrc =
             productImages[product.sku] ||
-            DEFAULT_PRODUCT_IMAGES[product.sku] ||
-            defaultImg;
+            DEFAULT_PRODUCT_IMAGES[product.sku] || "";
 
           return (
             <article className="product" key={product.sku} id={`prod-card-${product.sku}`}>
@@ -756,7 +734,7 @@ export function Storefront({
                 )}
                 title={text(lang, "Nhấn để phóng to ảnh chi tiết", "Click to enlarge photo")}
               >
-                <img
+                <LandingImage
                   src={imgSrc}
                   alt={productName(product, lang)}
                   className="product-card-img"
@@ -937,14 +915,14 @@ export function Storefront({
                   className="compare-image-card"
                   role="button"
                   tabIndex={0}
-                  onClick={() => setLightboxImg(productImages["group-3"] || "/images/products/group-3-sizes.jpg")}
+                  onClick={() => setLightboxImg(productImages["group-3"] || null)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") setLightboxImg(productImages["group-3"] || "/images/products/group-3-sizes.jpg");
+                    if (e.key === "Enter" || e.key === " ") setLightboxImg(productImages["group-3"] || null);
                   }}
                   title={text(lang, "Nhấn để phóng to ảnh chụp thực tế 3 hũ", "Click to enlarge 3-jar photo")}
                 >
-                  <img
-                    src={productImages["group-3"] || "/images/products/group-3-sizes.jpg"}
+                  <LandingImage
+                    src={productImages["group-3"]}
                     alt="Ảnh thật bộ 3 hũ cá bống Sông Trà 300g, 400g, 600g"
                     className="compare-stage-img"
                     loading="lazy"
@@ -966,12 +944,7 @@ export function Storefront({
                     type="button"
                     className="compare-quick-btn"
                     onClick={() => {
-                      const fallbackMap: Record<string, string> = {
-                        "CBST-300": "/images/gia-size-nho.png",
-                        "CBST-400": "/images/gia-size-vua.png",
-                        "CBST-600": "/images/gia-size-lon.png",
-                      };
-                      setLightboxImg(productImages[selectedCompare.sku] || fallbackMap[selectedCompare.sku] || "/images/products/group-3-sizes.jpg");
+                      setLightboxImg(productImages[selectedCompare.sku] || null);
                     }}
                   >
                     <Eye size={14} strokeWidth={2} />
@@ -980,7 +953,7 @@ export function Storefront({
                   <button
                     type="button"
                     className="compare-quick-btn"
-                    onClick={() => setLightboxImg(productImages["group-3"] || "/images/products/group-3-sizes.jpg")}
+                    onClick={() => setLightboxImg(productImages["group-3"] || null)}
                   >
                     <ZoomIn size={14} strokeWidth={2} />
                     <span>{text(lang, "Ảnh thực tế 3 hũ", "3-Jar Photo")}</span>
@@ -2121,8 +2094,7 @@ function OrderDetail({
 
   const canEditOrder =
     !!order && ["PENDING", "CONFIRMED", "PACKING"].includes(order.status);
-  const canTransition =
-    !!order && transitions(order.status, actor.role).length > 0;
+  const canTransition = !!order;
   const canPayment =
     !!order &&
     !["CANCELLED", "RETURNED"].includes(order.status) &&
@@ -2134,7 +2106,7 @@ function OrderDetail({
   const canReturnIntake =
     !!order &&
     actor.role === "OWNER_ADMIN" &&
-    ["RETURN_REQUESTED", "PARTIALLY_RETURNED", "DELIVERY_FAILED"].includes(
+    ["RETURN_REQUESTED", "PARTIALLY_RETURNED", "RETURNED", "DELIVERY_FAILED"].includes(
       order.status,
     );
   const canRefund =
@@ -2160,15 +2132,21 @@ function OrderDetail({
           )}
           size="md"
         >
+          {actor.role === "OWNER_ADMIN" && (
+            <p className="notice">
+              {text(lang,
+                "Có thể chuyển trực tiếp hoặc điều chỉnh lại trạng thái. Đổi trạng thái không tự thu/hoàn tiền hay nhập lại hàng; hãy dùng thao tác tương ứng để ghi nhận thực tế.",
+                "You can skip steps or correct the status. Status changes do not collect/refund payments or restock returns; record those using the corresponding actions.")}
+            </p>
+          )}
           <ActionForm
             action="transition"
             lang={lang}
             id={id}
-            initial={{ expectedVersion: order.version }}
+            initial={{ expectedVersion: order.version, status: order.status }}
             fieldOverrides={{
               expectedVersion: { type: "hidden" },
             }}
-            statusOptions={transitions(order.status, actor.role)}
             hideTitle
             onCancel={() => setActiveModal(null)}
             onSuccess={refresh}
@@ -2865,13 +2843,20 @@ function SalesOverviewChart({
           {(() => {
             const values = points.map((p) => p[tab]);
             const maxVal = Math.max(...values, 1);
+            const minVal = Math.min(...values, 0);
+            const ticks = [maxVal, (maxVal + minVal) / 2, minVal];
+            const formatTick = (value: number) => tab === "orders" ? String(Math.round(value)) : money(Math.round(value), lang);
+            const left = Math.max(90, ...ticks.map((value) => formatTick(value).length * 7 + 20));
+            const right = 580;
+            const yFor = (value: number) => 190 - ((value - minVal) / (maxVal - minVal)) * 150;
+            const baseline = yFor(0);
             const svgPoints = points.map((p, i) => {
-              const x = 50 + (i / Math.max(points.length - 1, 1)) * 520;
-              const y = 190 - (p[tab] / maxVal) * 140;
+              const x = points.length === 1 ? (left + right) / 2 : left + (i / (points.length - 1)) * (right - left);
+              const y = yFor(p[tab]);
               return { x, y, val: p[tab], label: p.date };
             });
             const pathD = `M ${svgPoints.map((pt) => `${pt.x} ${pt.y}`).join(" L ")}`;
-            const areaD = `${pathD} L ${svgPoints[svgPoints.length - 1].x} 200 L ${svgPoints[0].x} 200 Z`;
+            const areaD = `${pathD} L ${svgPoints[svgPoints.length - 1].x} ${baseline} L ${svgPoints[0].x} ${baseline} Z`;
 
             return (
               <svg
@@ -2886,10 +2871,15 @@ function SalesOverviewChart({
                     <stop offset="100%" stopColor="#D84012" stopOpacity="0.0" />
                   </linearGradient>
                 </defs>
-                <line x1="45" y1="40" x2="585" y2="40" stroke="#f1f5f9" strokeDasharray="4 4" />
-                <line x1="45" y1="90" x2="585" y2="90" stroke="#f1f5f9" strokeDasharray="4 4" />
-                <line x1="45" y1="140" x2="585" y2="140" stroke="#f1f5f9" strokeDasharray="4 4" />
-                <line x1="45" y1="190" x2="585" y2="190" stroke="#e2e8f0" />
+                {ticks.map((value, index) => (
+                  <g key={index}>
+                    <line x1={left} y1={yFor(value)} x2={right} y2={yFor(value)} stroke="#e2e8f0" strokeDasharray="4 4" />
+                    <text x={left - 12} y={yFor(value) + 4} textAnchor="end" className="chart-axis-label">{formatTick(value)}</text>
+                  </g>
+                ))}
+                {svgPoints.length === 1 && (
+                  <rect x={svgPoints[0].x - 24} y={Math.min(svgPoints[0].y, baseline)} width="48" height={Math.max(2, Math.abs(baseline - svgPoints[0].y))} rx="4" fill="#D84012" fillOpacity="0.2" />
+                )}
 
                 <path d={areaD} fill="url(#areaGradient)" />
                 <path
@@ -2912,17 +2902,7 @@ function SalesOverviewChart({
                   />
                 ))}
 
-                <text x="38" y="44" textAnchor="end" className="chart-axis-label">
-                  {tab === "orders" ? maxVal : money(maxVal, lang)}
-                </text>
-                <text x="38" y="119" textAnchor="end" className="chart-axis-label">
-                  {tab === "orders" ? Math.round(maxVal / 2) : money(Math.round(maxVal / 2), lang)}
-                </text>
-                <text x="38" y="194" textAnchor="end" className="chart-axis-label">
-                  0 ₫
-                </text>
-
-                {svgPoints.map((pt, idx) => (
+                {svgPoints.filter((_, idx) => idx % Math.max(1, Math.ceil(svgPoints.length / 7)) === 0 || idx === svgPoints.length - 1).map((pt, idx) => (
                   <text key={idx} x={pt.x} y="215" textAnchor="middle" className="chart-axis-label">
                     {pt.label}
                   </text>
@@ -3266,7 +3246,9 @@ export function InternalOrderCreator({
   onGoToOrders?: () => void;
 }) {
   const [cart, setCart] = useState<Record<string, number>>({
-    "CBST-300": 1,
+    "CBST-300": 0,
+    "CBST-400": 0,
+    "CBST-600": 0,
   });
   const [customer, setCustomer] = useState({
     name: "",
@@ -3457,7 +3439,11 @@ export function InternalOrderCreator({
               style={{ background: "#D84012", color: "#fff", borderColor: "#D84012", padding: "10px 20px" }}
               onClick={() => {
                 setCreatedOrder(null);
-                setCart({ "CBST-300": 1 });
+                setCart({
+                  "CBST-300": 0,
+                  "CBST-400": 0,
+                  "CBST-600": 0,
+                });
                 setCustomer({
                   name: "",
                   phone: "",
@@ -3647,7 +3633,7 @@ export function InternalOrderCreator({
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
                 <div>
                   <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#44403C", marginBottom: 6 }}>
-                    {text(lang, "Họ và tên khách hàng *", "Customer name *")}
+                    {text(lang, "Họ và tên khách hàng", "Customer name")} <span className="required-mark" aria-hidden="true">*</span>
                   </label>
                   <input
                     type="text"
@@ -3661,7 +3647,7 @@ export function InternalOrderCreator({
                 </div>
                 <div>
                   <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#44403C", marginBottom: 6 }}>
-                    {text(lang, "Số điện thoại *", "Phone number *")}
+                    {text(lang, "Số điện thoại", "Phone number")} <span className="required-mark" aria-hidden="true">*</span>
                   </label>
                   <input
                     type="tel"
@@ -3676,7 +3662,7 @@ export function InternalOrderCreator({
 
               <div style={{ marginBottom: 14 }}>
                 <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#44403C", marginBottom: 6 }}>
-                  {text(lang, "Địa chỉ nhận hàng (Số nhà, tên đường, phường/xã) *", "Shipping address *")}
+                  {text(lang, "Địa chỉ nhận hàng (Số nhà, tên đường, phường/xã)", "Shipping address")} <span className="required-mark" aria-hidden="true">*</span>
                 </label>
                 <input
                   type="text"
@@ -3693,7 +3679,7 @@ export function InternalOrderCreator({
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
                 <div>
                   <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#44403C", marginBottom: 6 }}>
-                    {text(lang, "Khu vực / Tỉnh thành *", "City / Province *")}
+                    {text(lang, "Khu vực / Tỉnh thành", "City / Province")} <span className="required-mark" aria-hidden="true">*</span>
                   </label>
                   <input
                     type="text"
@@ -3968,17 +3954,40 @@ export function MyOrdersWidget({
 
 export function MemberLeaderboardWidget({
   orders,
+  users,
+  actor,
+  onChanged,
   lang,
 }: {
   orders: RecordRow[];
+  users: MemberUser[];
+  actor: Actor;
+  onChanged?: () => void;
   commissionTotal?: number;
   lang: Lang;
 }) {
+  const [recalculating, setRecalculating] = useState(false);
+  const [commissionError, setCommissionError] = useState<unknown>(null);
+  const mutation = useRef(createMutation());
+  const recalculate = async () => {
+    if (recalculating) return;
+    setRecalculating(true);
+    setCommissionError(null);
+    try {
+      for (const order of orders.filter((order) => order.responsibleMemberId && ["DELIVERED", "PARTIALLY_RETURNED", "RETURNED"].includes(String(order.status)))) {
+        await mutation.current(`orders/${order.id}/recalculate-commission`, { expectedVersion: order.version });
+      }
+    } catch (error) {
+      setCommissionError(error);
+    } finally {
+      onChanged?.();
+      setRecalculating(false);
+    }
+  };
   const memberStats: Record<string, { memberId: string; totalOrders: number; deliveredOrders: number; revenue: number; commission: number }> = {};
 
   for (const o of orders) {
-    const memberId = String(o.responsibleMemberId ?? "");
-    if (!memberId) continue;
+    const memberId = String(o.responsibleMemberId ?? "").trim() || actor.id;
     if (!memberStats[memberId]) {
       memberStats[memberId] = {
         memberId,
@@ -3997,6 +4006,13 @@ export function MemberLeaderboardWidget({
   }
 
   const memberList = Object.values(memberStats).sort((a, b) => b.revenue - a.revenue);
+  const memberName = (memberId: string) => {
+    if (memberId === actor.id) {
+      return users.find((user) => user.id === actor.id)?.displayName?.trim() || actor.displayName?.trim() || "Lê Phạm Hoài Bảo";
+    }
+    const user = users.find((candidate) => candidate.id === memberId);
+    return user?.displayName || user?.emailNormalized || memberId;
+  };
 
   return (
     <div className="apex-card" style={{ marginBottom: 24 }}>
@@ -4013,6 +4029,12 @@ export function MemberLeaderboardWidget({
         </div>
       </div>
 
+      {actor.role === "OWNER_ADMIN" && onChanged && (
+        <button type="button" disabled={recalculating} onClick={recalculate}>
+          {recalculating ? text(lang, "Đang cập nhật…", "Updating…") : text(lang, "Cập nhật hoa hồng các đơn đang hiển thị", "Recalculate commissions for displayed orders")}
+        </button>
+      )}
+      <ErrorNotice error={commissionError} lang={lang} />
       {memberList.length === 0 ? (
         <div className="chart-empty-state">
           <Users size={32} strokeWidth={1.5} color="#A8A29E" style={{ margin: "0 auto 8px" }} />
@@ -4043,7 +4065,7 @@ export function MemberLeaderboardWidget({
                     <span style={{ marginRight: 8, color: idx === 0 ? "#D84012" : "#78716C" }}>
                       #{idx + 1}
                     </span>
-                    {m.memberId}
+                    {memberName(m.memberId)}
                   </td>
                   <td>{m.totalOrders}</td>
                   <td style={{ fontWeight: 700, color: "#16A34A" }}>{m.deliveredOrders}</td>
@@ -4893,7 +4915,7 @@ export function MediaManager({ lang }: { lang: Lang }) {
             <div className="form-grid">
               {uploadMode === "url" ? (
                 <label className="wide">
-                  <span>{text(lang, "URL hình ảnh (Cloudinary, Web CDN...)", "Image URL (Cloudinary, CDN...)")} *</span>
+                  <span>{text(lang, "URL hình ảnh (Cloudinary, Web CDN...)", "Image URL (Cloudinary, CDN...)")} <span className="required-mark" aria-hidden="true">*</span></span>
                   <input
                     type="url"
                     required
@@ -4911,7 +4933,7 @@ export function MediaManager({ lang }: { lang: Lang }) {
                 </label>
               ) : (
                 <label className="wide">
-                  <span>{text(lang, "Chọn tệp hình ảnh", "Select Image File")} *</span>
+                  <span>{text(lang, "Chọn tệp hình ảnh", "Select Image File")} <span className="required-mark" aria-hidden="true">*</span></span>
                   <input
                     type="file"
                     accept="image/*"
@@ -4932,7 +4954,7 @@ export function MediaManager({ lang }: { lang: Lang }) {
               )}
 
               <label>
-                <span>{text(lang, "Tiêu đề hình ảnh", "Image Title")} *</span>
+                <span>{text(lang, "Tiêu đề hình ảnh", "Image Title")} <span className="required-mark" aria-hidden="true">*</span></span>
                 <input
                   type="text"
                   required
@@ -5052,7 +5074,7 @@ export function MediaManager({ lang }: { lang: Lang }) {
           <form onSubmit={handleSaveSettings} className="media-form">
             <div className="form-grid">
               <label>
-                <span>{text(lang, "Cloudinary Cloud Name", "Cloudinary Cloud Name")} *</span>
+                <span>{text(lang, "Cloudinary Cloud Name", "Cloudinary Cloud Name")} <span className="required-mark" aria-hidden="true">*</span></span>
                 <input
                   type="text"
                   required
@@ -5344,6 +5366,7 @@ function OrdersTable({
 function AdminInner({
   actor,
   lang,
+  initialSection = "dashboard",
   products = [],
   onUnauthorized,
   onLogout,
@@ -5352,6 +5375,7 @@ function AdminInner({
 }: {
   actor: Actor;
   lang: Lang;
+  initialSection?: string;
   products?: Product[];
   onUnauthorized?: () => void;
   onLogout?: () => void;
@@ -5359,7 +5383,29 @@ function AdminInner({
   onToggleLang?: () => void;
 }) {
   const queryClient = useQueryClient();
-  const [section, setSection] = useState("dashboard");
+  const [section, updateSection] = useState(initialSection);
+  const setSection = (next: string) => {
+    updateSection(next);
+    navigate(`/admin/${next}`);
+  };
+  useEffect(() => {
+    const syncSection = () => {
+      const requested = adminSection(window.location.pathname);
+      if (!requested) return;
+      const next = sectionsFor(actor.role).includes(requested) ? requested : "dashboard";
+      updateSection(next);
+      setPage(0);
+      setSelected(null);
+      navigate(`/admin/${next}`, true);
+    };
+    syncSection();
+    window.addEventListener("popstate", syncSection);
+    window.addEventListener("app:navigate", syncSection);
+    return () => {
+      window.removeEventListener("popstate", syncSection);
+      window.removeEventListener("app:navigate", syncSection);
+    };
+  }, [actor.role]);
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<RecordRow | null>(null);
   const [showCreateOrderModal, setShowCreateOrderModal] = useState(false);
@@ -5404,7 +5450,7 @@ function AdminInner({
     queryFn: () => fetchUsersList(),
     staleTime: usersPolicy.staleTime,
     gcTime: usersPolicy.gcTime,
-    enabled: section === "commissions" || (owner && section === "orders"),
+    enabled: owner && ["dashboard", "orders", "commissions"].includes(section),
   });
 
   const rows: RecordRow[] = Array.isArray(sectionQuery.data)
@@ -5879,6 +5925,12 @@ function AdminInner({
                       {/* Member Performance Breakdown */}
                       <MemberLeaderboardWidget
                         orders={dashboardOrders}
+                        users={allUsers}
+                        actor={actor}
+                        onChanged={() => {
+                          invalidateAdminQueries(queryClient, actor, "order_updated");
+                          invalidateAdminQueries(queryClient, actor, "commission_payout");
+                        }}
                         commissionTotal={Number(dashboard.commissionVnd ?? 0)}
                         lang={lang}
                       />
@@ -5899,8 +5951,8 @@ function AdminInner({
                         <p className="notice">
                           {text(
                             lang,
-                            "Số liệu toàn thời gian. Biến động tiền hoạt động không phải số dư ngân hàng. Hoa hồng chỉ đủ điều kiện khi đã giao, thu đủ tiền và chốt chi phí.",
-                            "All-time figures. Operating cash movement is not a bank balance. Commission requires delivery, full receipt of payment, and finalized costs.",
+                            "Số liệu toàn thời gian. Biến động tiền hoạt động không phải số dư ngân hàng. Hoa hồng được tính khi giao thành công, dựa trên chênh lệch giá bán và giá vốn.",
+                            "All-time figures. Operating cash movement is not a bank balance. Commission accrues on successful delivery from selling price minus product cost.",
                           )}
                         </p>
                       </details>
@@ -6162,6 +6214,7 @@ function AdminInner({
                   onUnauthorized={onUnauthorized}
                 />
               ) : section === "commissions" ? (
+                owner ? (
                 <CommissionManager
                   users={allUsers}
                   ledger={rows as unknown as CommissionLedgerEntry[]}
@@ -6169,6 +6222,9 @@ function AdminInner({
                   onRefresh={() => refresh("commission_payout")}
                   onUnauthorized={onUnauthorized}
                 />
+                ) : (
+                  <MemberCommissions actor={actor} ledger={rows as unknown as CommissionLedgerEntry[]} lang={lang} />
+                )
               ) : section === "promotions" || section === "vouchers" ? (
                 <PromotionManager
                   kind={section}
@@ -6293,6 +6349,7 @@ function AdminInner({
 export function Admin(props: {
   actor: Actor;
   lang: Lang;
+  initialSection?: string;
   products?: Product[];
   onUnauthorized?: () => void;
   onLogout?: () => void;
@@ -6324,16 +6381,44 @@ export const STORE_NAV_ITEMS = [
 export default function App({
   initialView = "store",
   initialImages,
+  initialAdminSection = "dashboard",
 }: {
   initialView?: string;
   initialImages?: Record<string, string>;
+  initialAdminSection?: string;
 } = {}) {
   const [lang, setLang] = useState<Lang>("vi");
-  const [view, setView] = useState(initialView === "reset" ? "login" : initialView);
-  const [authTab, setAuthTab] = useState<"login" | "reset">(
+  const [view, updateView] = useState(initialView === "reset" ? "login" : initialView);
+  const setView = (next: string) => {
+    navigate(next === "admin" ? (adminSection(window.location.pathname) ? window.location.pathname : "/admin/dashboard") : next === "login" ? "/login" : "/");
+    updateView(next);
+  };
+  const [authTab, updateAuthTab] = useState<"login" | "reset">(
     initialView === "reset" ? "reset" : "login",
   );
+  const setAuthTab = (next: "login" | "reset") => {
+    updateAuthTab(next);
+    navigate(next === "reset" ? "/reset-password" : "/login");
+  };
   const [actor, setActor] = useState<Actor | null>(null);
+  useEffect(() => {
+    const syncView = () => {
+      const pathname = window.location.pathname;
+      if (adminSection(pathname)) {
+        updateView(actor ? "admin" : "login");
+        updateAuthTab("login");
+      } else if (pathname === "/login" || pathname === "/reset-password") {
+        updateView("login");
+        updateAuthTab(pathname === "/reset-password" ? "reset" : "login");
+      } else if (pathname === "/") updateView("store");
+    };
+    window.addEventListener("popstate", syncView);
+    window.addEventListener("app:navigate", syncView);
+    return () => {
+      window.removeEventListener("popstate", syncView);
+      window.removeEventListener("app:navigate", syncView);
+    };
+  }, [actor]);
   const [products, setProducts] = useState<Product[]>([]);
   const [catalogError, setCatalogError] = useState<unknown>(null);
   const [catalogRevision, setCatalogRevision] = useState(0);
@@ -6425,13 +6510,13 @@ export default function App({
         setAuthTab("reset");
       } else if (
         pathname === "/login" ||
-        pathname === "/admin" ||
+        adminSection(pathname) !== null ||
         hash === "#login" ||
         search.includes("view=login") ||
         search.includes("login")
       ) {
-        setView("login");
-        setAuthTab("login");
+        updateView("login");
+        updateAuthTab("login");
       }
     }
     apiRequest<Actor>("auth/me")
@@ -6439,8 +6524,8 @@ export default function App({
         setActor(me);
         if (typeof window !== "undefined") {
           const pathname = window.location.pathname;
-          if (pathname === "/admin" || window.location.hash === "#admin") {
-            setView("admin");
+          if (adminSection(pathname) || window.location.hash === "#admin") {
+            updateView("admin");
           }
         }
       })
@@ -6506,6 +6591,7 @@ export default function App({
     return (
       <Admin
         key={actor.id}
+        initialSection={typeof window !== "undefined" ? adminSection(window.location.pathname) ?? initialAdminSection : initialAdminSection}
         actor={actor}
         lang={lang}
         products={products}
@@ -6520,7 +6606,7 @@ export default function App({
     return (
       <>
         <header className="site-header">
-          <a className="brand" href="#" onClick={() => setView("store")}>
+          <a className="brand" href="/" onClick={(event) => { event.preventDefault(); setView("store"); }}>
             <span className="brand-main">Cá Bống Sông Trà</span>
             <span className="brand-sub">
               {text(lang, "ĐẶC SẢN QUẢNG NGÃI", "QUANG NGAI SPECIALTY")}
@@ -6924,25 +7010,7 @@ export default function App({
         <span>VI / EN · VND</span>
       </footer>
       {view === "store" && (
-        <div className="mobile-sticky-bar" aria-label={text(lang, "Thao tác nhanh", "Quick actions")}>
-          <a
-            className="button sticky-primary"
-            href="https://zalo.me/0702478561"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-              <MessageCircle size={18} strokeWidth={1.8} />
-              {text(lang, "Nhắn Zalo", "Chat Zalo")}
-            </span>
-          </a>
-          <a className="button secondary sticky-secondary" href="tel:0702478561">
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-              <PhoneCall size={18} strokeWidth={1.8} />
-              {text(lang, "Gọi: 070 2478 561", "Call: 070 2478 561")}
-            </span>
-          </a>
-        </div>
+        <ContactButtons lang={lang} floating />
       )}
     </>
   );

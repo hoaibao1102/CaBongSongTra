@@ -1,4 +1,5 @@
 import "reflect-metadata";
+import { setServers } from "node:dns";
 import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
@@ -6,6 +7,8 @@ import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import { AppModule } from "./app.module";
 async function bootstrap() {
+  const localDnsServers = process.env.LOCAL_DNS_SERVERS?.split(",").map(value => value.trim()).filter(Boolean);
+  if (localDnsServers?.length) setServers(localDnsServers);
   const app = await NestFactory.create(AppModule);
   app.setGlobalPrefix("api/v1");
   app.use(helmet());

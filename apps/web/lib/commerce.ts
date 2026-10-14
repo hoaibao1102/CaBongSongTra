@@ -104,7 +104,7 @@ export const actions: Record<string, Action> = {
     fields: [
       version,
       field("status", "Trạng thái mới", "New status", {
-        options: Object.keys(graph).filter((x) => x !== "PENDING"),
+        options: Object.keys(graph),
       }),
       reason,
     ],

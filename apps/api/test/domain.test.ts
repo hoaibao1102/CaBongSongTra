@@ -16,9 +16,9 @@ describe("local domain contract", () => {
   it("derives payment status and preserves genuine losses", () => {
     expect(derivePaymentStatus(199000, 100000, 0)).toBe("PARTIALLY_PAID");
     expect(derivePaymentStatus(199000, 199000, 50000)).toBe("PARTIALLY_REFUNDED");
-    expect(calculateCommission({ ownerRole: "MEMBER", collectedVnd: 100000, cogsVnd: 140000, directCostsVnd: 15000, eligible: true })).toEqual({ baseProfitVnd: -55000, memberAmountVnd: 0, ownerAmountVnd: -55000 });
-    expect(calculateCommission({ ownerRole: "MEMBER", collectedVnd: 199000, cogsVnd: 140000, directCostsVnd: 15000, eligible: true })).toEqual({ baseProfitVnd: 44000, memberAmountVnd: 17600, ownerAmountVnd: 26400 });
-    expect(() => calculateCommission({ ownerRole: "MEMBER", collectedVnd: 0.5, cogsVnd: 0, directCostsVnd: 0, eligible: true })).toThrow("INVALID_MONEY");
-    expect(() => calculateCommission({ ownerRole: "MEMBER", collectedVnd: 1, cogsVnd: 0, directCostsVnd: 0, eligible: true, memberRateBps: -1 })).toThrow("INVALID_RATE");
+    expect(calculateCommission({ ownerRole: "MEMBER", sellingPriceVnd: 100000, originalCostVnd: 140000, eligible: true })).toEqual({ baseProfitVnd: -40000, memberAmountVnd: 0, ownerAmountVnd: -40000 });
+    expect(calculateCommission({ ownerRole: "MEMBER", sellingPriceVnd: 199000, originalCostVnd: 140000, eligible: true })).toEqual({ baseProfitVnd: 59000, memberAmountVnd: 23600, ownerAmountVnd: 35400 });
+    expect(() => calculateCommission({ ownerRole: "MEMBER", sellingPriceVnd: 0.5, originalCostVnd: 0, eligible: true })).toThrow("INVALID_MONEY");
+    expect(() => calculateCommission({ ownerRole: "MEMBER", sellingPriceVnd: 1, originalCostVnd: 0, eligible: true, memberRateBps: -1 })).toThrow("INVALID_RATE");
   });
 });

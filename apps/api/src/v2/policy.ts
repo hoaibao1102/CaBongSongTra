@@ -23,6 +23,7 @@ export function orderProjection(order: OrderView, actor: Actor) {
     ...(order.pricingSchemaVersion === 2 ? { pricingSchemaVersion: 2, pricingMode: order.pricingMode, merchandiseSubtotalVnd: order.merchandiseSubtotalVnd, discountVnd: order.discountVnd, pricedAt: order.pricedAt } : {}),
     totalVnd: order.totalVnd, receiptsVnd: order.receiptsVnd, refundsVnd: order.refundsVnd, responsibleMemberId: order.responsibleMemberId, createdAt: order.createdAt,
     paymentDueVnd: paymentDue(order),
+    commissionVnd: order.commissionVnd,
     ...(actor.role === "OWNER_ADMIN" ? { cogsVnd: order.cogsVnd, directCostsVnd: order.directCostsVnd, costsFinalized: order.costsFinalized, commissionVnd: order.commissionVnd,
       shippedAt: order.shippedAt, deliveredAt: order.deliveredAt,
       ...(order.allocations ? { allocations: order.allocations.map(line => ({ batchId: line.batchId, sku: line.sku, qty: line.qty, returnedQty: line.returnedQty ?? 0, returnableQty: Math.max(0, line.qty - (line.returnedQty ?? 0)), landedUnitCostVnd: line.landedUnitCostVnd })) } : {}),
@@ -38,8 +39,9 @@ export function paymentDue(order: { status: string; totalVnd?: number; receiptsV
   return Math.max(0, (order.totalVnd ?? 0) - (order.returnValueVnd ?? 0) - (order.receiptsVnd ?? 0) + (order.returnRefundsVnd ?? 0));
 }
 export function commissionTarget(order: { status: string; deliveredAt?: Date; returnValueVnd?: number; returnRefundsVnd?: number; responsibleMemberId?: string | null; totalVnd: number; receiptsVnd: number; refundsVnd: number; cogsVnd: number; directCostsVnd: number; costsFinalized: boolean; commissionRateBps: number }) {
+  if (order.status === "RETURNED") return 0;
   const revenue = order.totalVnd - (order.returnValueVnd ?? 0) - order.refundsVnd + (order.returnRefundsVnd ?? 0);
   const recognized = order.status === "DELIVERED" || (!!order.deliveredAt && ["PARTIALLY_RETURNED", "RETURNED"].includes(order.status));
-  return calculateCommission({ ownerRole: order.responsibleMemberId ? "MEMBER" : "OWNER_ADMIN", collectedVnd: revenue, cogsVnd: order.cogsVnd, directCostsVnd: order.directCostsVnd,
-    eligible: recognized && order.costsFinalized && order.receiptsVnd - order.refundsVnd >= revenue && (order.returnRefundsVnd ?? 0) >= Math.max(0, order.receiptsVnd - order.totalVnd + (order.returnValueVnd ?? 0)), memberRateBps: order.commissionRateBps }).memberAmountVnd;
+  return calculateCommission({ ownerRole: order.responsibleMemberId ? "MEMBER" : "OWNER_ADMIN", sellingPriceVnd: revenue, originalCostVnd: order.cogsVnd,
+    eligible: recognized, memberRateBps: order.commissionRateBps }).memberAmountVnd;
 }

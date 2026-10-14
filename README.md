@@ -44,10 +44,10 @@ the later uncommitted application implementations or ignored secrets.
   `Asia/Ho_Chi_Minh`. Preserve price/cost/rate snapshots and append-only payment,
   refund, expense, commission and payout history. Round commission half up to
   VND; the remainder belongs to the Owner share.
-- Member commission is 40% of positive eligible distributable profit after actual
-  batch COGS and shop-paid direct costs; zero/negative profit creates no positive
+- Member commission is the member's snapshotted percentage of positive product
+  margin (order selling price minus actual batch COGS); zero/negative margin creates no positive
   commission. Preserve real losses. Owner-direct orders create no Member
-  commission. Eligibility requires delivery, received payment and finalized costs;
+  commission. Eligibility begins when the order is successfully delivered;
   later refunds/returns require adjustments, never deletion of previous payouts.
 - Approved packs are `CBST-300/400/600`, retail 109000/139000/199000 VND. Net weight
   includes fish and sauce, not packaging. Opening costs 65000/95000/140000 VND

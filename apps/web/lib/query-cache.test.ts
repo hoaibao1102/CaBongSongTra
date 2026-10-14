@@ -7,6 +7,7 @@ import {
   createAdminQueryClient,
   getSectionEndpoint,
   fetchSectionData,
+  fillMemberOrderCommissions,
 } from "./query-cache";
 import type { Actor } from "./types";
 
@@ -18,6 +19,28 @@ describe("Smart Cache & Data Fetching Architecture", () => {
   beforeEach(() => {
     queryClient = createAdminQueryClient();
     vi.restoreAllMocks();
+  });
+  it("fills missing member order commissions from personal accruals and reversals, excluding payouts", async () => {
+    const fetcher = vi.fn().mockResolvedValue(Response.json([
+      { kind: "COMMISSION", orderId: "old", amountVnd: 17148 },
+      { kind: "COMMISSION", orderId: "old", amountVnd: -17148 },
+      { kind: "COMMISSION", orderId: "old", amountVnd: 17148 },
+      { kind: "COMMISSION", orderId: "new", amountVnd: 51026 },
+      { kind: "PAYOUT", orderId: "new", amountVnd: 10000 },
+    ]));
+    expect(await fillMemberOrderCommissions([{ id: "old" }, { id: "new" }], fetcher)).toEqual([
+      { id: "old", commissionVnd: 17148 }, { id: "new", commissionVnd: 51026 },
+    ]);
+    expect(fetcher.mock.calls[0][0]).toBe("/api/v1/commissions/me?page=0&limit=100");
+  });
+  it("preserves an explicit zero commission from the API", async () => {
+    const fetcher = vi.fn();
+    expect(await fillMemberOrderCommissions([{ id: "o", commissionVnd: 0 }], fetcher)).toEqual([{ id: "o", commissionVnd: 0 }]);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it("does not silently show zero if personal ledger retrieval fails", async () => {
+    const fetcher = vi.fn().mockResolvedValue(Response.json({ error: { code: "SESSION_INVALID" } }, { status: 401 }));
+    await expect(fillMemberOrderCommissions([{ id: "o" }], fetcher)).rejects.toMatchObject({ status: 401 });
   });
 
   describe("1. Differentiated Business Stale & GC Policies", () => {
@@ -78,6 +101,12 @@ describe("Smart Cache & Data Fetching Architecture", () => {
   });
 
   describe("3. Targeted Cache Invalidation per Business Action", () => {
+    it("refreshes commission figures everywhere after an order update", () => {
+      const keys = ["orders", "dashboardOrders", "dashboard", "commissions"].map((section) => makeAdminQueryKey(ownerActor, section));
+      keys.forEach((key) => queryClient.setQueryData(key, []));
+      invalidateAdminQueries(queryClient, ownerActor, "order_updated");
+      keys.forEach((key) => expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true));
+    });
     it("order_created invalidates orders, dashboard, and inventory but leaves products untouched", async () => {
       const ordersKey = makeAdminQueryKey(ownerActor, "orders");
       const dashKey = makeAdminQueryKey(ownerActor, "dashboard");

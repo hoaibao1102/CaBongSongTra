@@ -457,7 +457,7 @@ export function ExpenseManager({
 
           <div style={{ marginBottom: 16 }}>
             <label>
-              <span>{text(lang, "Nhóm chi phí", "Expense Scope")} *</span>
+              <span>{text(lang, "Nhóm chi phí", "Expense Scope")} <span className="required-mark" aria-hidden="true">*</span></span>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 6 }}>
                 <button
                   type="button"
@@ -488,7 +488,7 @@ export function ExpenseManager({
           {scope === "ORDER" && (
             <div style={{ marginBottom: 16 }}>
               <label>
-                <span>{text(lang, "Chọn đơn hàng liên quan", "Select order")} *</span>
+                <span>{text(lang, "Chọn đơn hàng liên quan", "Select order")} <span className="required-mark" aria-hidden="true">*</span></span>
                 <SearchableSelect
                   options={orders.map((o) => ({
                     value: o.id,
@@ -514,7 +514,7 @@ export function ExpenseManager({
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
             <label>
-              <span>{text(lang, "Loại chi phí", "Category")} *</span>
+              <span>{text(lang, "Loại chi phí", "Category")} <span className="required-mark" aria-hidden="true">*</span></span>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
@@ -527,7 +527,7 @@ export function ExpenseManager({
             </label>
 
             <label>
-              <span>{text(lang, "Số tiền chi (VND)", "Amount (VND)")} *</span>
+              <span>{text(lang, "Số tiền chi (VND)", "Amount (VND)")} <span className="required-mark" aria-hidden="true">*</span></span>
               <CurrencyInput
                 value={amountVnd}
                 onChange={(val) => setAmountVnd(val)}
@@ -539,7 +539,7 @@ export function ExpenseManager({
 
           <div style={{ marginBottom: 20 }}>
             <label>
-              <span>{text(lang, "Lý do / Diễn giải", "Reason / Description")} *</span>
+              <span>{text(lang, "Lý do / Diễn giải", "Reason / Description")} <span className="required-mark" aria-hidden="true">*</span></span>
               <textarea
                 rows={2}
                 required

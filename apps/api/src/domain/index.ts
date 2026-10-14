@@ -30,11 +30,11 @@ export function selectReservationBatches(batches: ReservationBatch[], requested:
   if (remaining) throw new Error("OUT_OF_STOCK");
   return allocations;
 }
-export function calculateCommission(input: { ownerRole: Role; collectedVnd: number; cogsVnd: number; directCostsVnd: number; eligible: boolean; memberRateBps?: number }) {
-  if ([input.collectedVnd, input.cogsVnd, input.directCostsVnd].some(value => !Number.isSafeInteger(value))) throw new Error("INVALID_MONEY");
+export function calculateCommission(input: { ownerRole: Role; sellingPriceVnd: number; originalCostVnd: number; eligible: boolean; memberRateBps?: number }) {
+  if ([input.sellingPriceVnd, input.originalCostVnd].some(value => !Number.isSafeInteger(value))) throw new Error("INVALID_MONEY");
   const rate = input.memberRateBps ?? 4000;
   if (!Number.isInteger(rate) || rate < 0 || rate > 10000) throw new Error("INVALID_RATE");
-  const baseProfitVnd = input.collectedVnd - input.cogsVnd - input.directCostsVnd;
+  const baseProfitVnd = input.sellingPriceVnd - input.originalCostVnd;
   const memberAmountVnd = input.eligible && input.ownerRole === "MEMBER" && baseProfitVnd > 0 ? Number((BigInt(baseProfitVnd) * BigInt(rate) + 5000n) / 10000n) : 0;
   return { baseProfitVnd, memberAmountVnd, ownerAmountVnd: baseProfitVnd - memberAmountVnd };
 }

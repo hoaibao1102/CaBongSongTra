@@ -92,6 +92,7 @@ export function invalidateAdminQueries(
     case "order_created":
     case "order_updated":
     case "order_transition":
+      void queryClient.invalidateQueries({ queryKey: [...prefix, "commissions"] });
       void queryClient.invalidateQueries({ queryKey: [...prefix, "orders"] });
       void queryClient.invalidateQueries({ queryKey: [...prefix, "dashboardOrders"] });
       void queryClient.invalidateQueries({ queryKey: [...prefix, "dashboard"] });
@@ -224,7 +225,32 @@ export async function fetchSectionData(
 ): Promise<RecordRow[] | RecordRow | null> {
   const path = getSectionEndpoint(section, owner, page);
   if (!path) return null;
-  return apiRequest<RecordRow[] | RecordRow>(path, undefined, fetcher);
+  if (section === "commissions") {
+    const entries: RecordRow[] = [];
+    const endpoint = owner ? "commissions" : "commissions/me";
+    for (let ledgerPage = 0; ; ledgerPage++) {
+      const batch = await apiRequest<RecordRow[]>(`${endpoint}?page=${ledgerPage}&limit=100`, undefined, fetcher);
+      entries.push(...batch);
+      if (batch.length < 100) return entries;
+    }
+  }
+  const data = await apiRequest<RecordRow[] | RecordRow>(path, undefined, fetcher);
+  return section === "orders" && !owner && Array.isArray(data)
+    ? fillMemberOrderCommissions(data, fetcher)
+    : data;
+}
+
+/** Older API deployments omit commissionVnd in member order projections. */
+export async function fillMemberOrderCommissions(orders: RecordRow[], fetcher: typeof fetch = fetch): Promise<RecordRow[]> {
+  if (!orders.some((order) => order.commissionVnd == null)) return orders;
+  const ledger = await fetchSectionData("commissions", false, 0, fetcher) as RecordRow[];
+  const totals = new Map<string, number>();
+  for (const entry of ledger) {
+    if (entry.kind !== "COMMISSION" || !entry.orderId) continue;
+    const id = String(entry.orderId);
+    totals.set(id, (totals.get(id) ?? 0) + Number(entry.amountVnd));
+  }
+  return orders.map((order) => ({ ...order, commissionVnd: order.commissionVnd ?? totals.get(String(order.id)) ?? 0 }));
 }
 
 /**
@@ -234,7 +260,7 @@ export async function fetchDashboardOrders(
   fetcher: typeof fetch = fetch,
 ): Promise<RecordRow[]> {
   const data = await apiRequest<RecordRow[]>("orders?page=0&limit=100", undefined, fetcher);
-  return Array.isArray(data) ? data : [];
+  return Array.isArray(data) ? fillMemberOrderCommissions(data, fetcher) : [];
 }
 
 /**

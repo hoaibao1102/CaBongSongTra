@@ -49,7 +49,7 @@ describe("V2.2 pricing integration", () => {
     Object.assign(db, { scopedOrder: async () => order, saveOrder: vi.fn() });
     const move = vi.spyOn(service.discounts, method).mockResolvedValue(null);
     await service.transition(actor, "o", { status: to, expectedVersion: 0, reason: "test" }, "key", "r");
-    expect(move).toHaveBeenCalledWith(order, session);
+    expect(move).toHaveBeenCalledWith(method === "consumeVoucher" ? { ...order, status: "PENDING" } : order, session);
   });
   it("leaves delivery-failed vouchers consumed and blocks V2 edits with a stable error", async () => {
     const { service, db } = fixture();
