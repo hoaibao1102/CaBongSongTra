@@ -508,7 +508,7 @@ export function UserManager({
 
           <div style={{ marginBottom: 16 }}>
             <label>
-              <span>{text(lang, "Tên hiển thị / Họ tên CTV", "Full name")} *</span>
+              <span>{text(lang, "Tên hiển thị / Họ tên CTV", "Full name")} <span className="required-mark" aria-hidden="true">*</span></span>
               <input
                 type="text"
                 required
@@ -521,7 +521,7 @@ export function UserManager({
 
           <div style={{ marginBottom: 16 }}>
             <label>
-              <span>{text(lang, "Email đăng nhập", "Email address")} *</span>
+              <span>{text(lang, "Email đăng nhập", "Email address")} <span className="required-mark" aria-hidden="true">*</span></span>
               <input
                 type="email"
                 required
@@ -534,7 +534,7 @@ export function UserManager({
 
           <div style={{ marginBottom: 20 }}>
             <label>
-              <span>{text(lang, "Mật khẩu khởi tạo (tối thiểu 12 ký tự)", "Initial password")} *</span>
+              <span>{text(lang, "Mật khẩu khởi tạo (tối thiểu 12 ký tự)", "Initial password")} <span className="required-mark" aria-hidden="true">*</span></span>
               <input
                 type="password"
                 required
@@ -585,7 +585,7 @@ export function UserManager({
 
             <div style={{ marginBottom: 16 }}>
               <label>
-                <span>{text(lang, "Tỷ lệ hoa hồng (%)", "Commission Rate (%)")} *</span>
+                <span>{text(lang, "Tỷ lệ hoa hồng (%)", "Commission Rate (%)")} <span className="required-mark" aria-hidden="true">*</span></span>
                 <input
                   type="number"
                   min={0}
@@ -657,7 +657,7 @@ export function UserManager({
 
             <div style={{ marginBottom: 16 }}>
               <label>
-                <span>{text(lang, "Tên ngân hàng", "Bank Name")} *</span>
+                <span>{text(lang, "Tên ngân hàng", "Bank Name")} <span className="required-mark" aria-hidden="true">*</span></span>
                 <input
                   type="text"
                   required
@@ -670,7 +670,7 @@ export function UserManager({
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
               <label>
-                <span>{text(lang, "Số tài khoản", "Account Number")} *</span>
+                <span>{text(lang, "Số tài khoản", "Account Number")} <span className="required-mark" aria-hidden="true">*</span></span>
                 <input
                   type="text"
                   required
@@ -680,7 +680,7 @@ export function UserManager({
               </label>
 
               <label>
-                <span>{text(lang, "Tên chủ tài khoản", "Account Holder")} *</span>
+                <span>{text(lang, "Tên chủ tài khoản", "Account Holder")} <span className="required-mark" aria-hidden="true">*</span></span>
                 <input
                   type="text"
                   required

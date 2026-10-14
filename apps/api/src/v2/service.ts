@@ -1,7 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
 import { randomBytes, randomUUID } from "node:crypto";
 import type { ClientSession } from "mongoose";
-import { isOrderTransitionAllowed } from "../domain";
 import { hashPassword } from "../auth/password";
 import { MongoRepository } from "./repository";
 import { computePricing, returnCredit, safeQuote } from "./pricing";
@@ -170,7 +169,7 @@ export class CommerceService {
     });
   }
   async listOrders(actor: Actor, page: number, limit: number) {
-    const fields = "id orderCode responsibleMemberId status version customer items totalVnd receiptsVnd refundsVnd returnValueVnd returnRefundsVnd createdAt pricingSchemaVersion pricingMode merchandiseSubtotalVnd discountVnd pricedAt" + (actor.role === "OWNER_ADMIN" ? " cogsVnd directCostsVnd costsFinalized commissionVnd" : "");
+    const fields = "id orderCode responsibleMemberId status version customer items totalVnd receiptsVnd refundsVnd returnValueVnd returnRefundsVnd createdAt commissionVnd pricingSchemaVersion pricingMode merchandiseSubtotalVnd discountVnd pricedAt" + (actor.role === "OWNER_ADMIN" ? " cogsVnd directCostsVnd costsFinalized" : "");
     const orders = await this.db.orders.find(orderScope(actor)).select(fields).sort({ createdAt: -1, id: 1 }).skip(page * limit).limit(limit).lean();
     return orders.map(order => orderProjection(order, actor));
   }
@@ -240,7 +239,7 @@ export class CommerceService {
     this.owner(actor);
     return this.db.idempotent(`${actor.id}:return:${id}`, key, dto, async session => {
       const order = await this.db.scopedOrder(id, {}, session); this.version(order, dto.expectedVersion);
-      if (!order.shippedAt || !["RETURN_REQUESTED", "PARTIALLY_RETURNED", "DELIVERY_FAILED"].includes(order.status)) throw new ConflictException("RETURN_NOT_ALLOWED");
+      if (!order.shippedAt || !["RETURN_REQUESTED", "PARTIALLY_RETURNED", "RETURNED", "DELIVERY_FAILED"].includes(order.status)) throw new ConflictException("RETURN_NOT_ALLOWED");
       let credit = 0, recoveredCost = 0;
       for (const line of dto.lines) {
         const allocation = order.allocations.find(value => value.batchId === line.batchId);
@@ -282,25 +281,28 @@ export class CommerceService {
     return this.db.idempotent(`${actor.id}:transition:${id}`, key, dto, async session => {
       const order = await this.db.scopedOrder(id, orderScope(actor), session);
       this.version(order, dto.expectedVersion);
-      if (!isOrderTransitionAllowed(order.status, dto.status)) throw new ConflictException("INVALID_STATE_TRANSITION");
-      if (["PARTIALLY_RETURNED", "RETURNED"].includes(dto.status)) throw new ConflictException("PHYSICAL_RETURN_REQUIRED");
-      if (["RETURN_REQUESTED", "PARTIALLY_RETURNED", "RETURNED"].includes(dto.status)) this.owner(actor);
       const from = order.status;
+      if (from === dto.status) return { id, status: order.status, version: order.version };
       const now = new Date();
-      if (dto.status === "CONFIRMED") {
+      const wasShipped = !!order.shippedAt;
+      const ship = ["SHIPPING", "DELIVERED", "DELIVERY_FAILED"].includes(dto.status) && !wasShipped;
+      const needsReservation = ["CONFIRMED", "PACKING", "SHIPPING", "DELIVERED", "DELIVERY_FAILED"].includes(dto.status);
+      if (needsReservation && !wasShipped && !["CONFIRMED", "PACKING"].includes(from)) {
         await this.reserve(order, actor, session, dto.reason);
-        if (order.voucherId) await this.discounts.consumeVoucher(order, session);
+        if (order.voucherId) await this.discounts.consumeVoucher({ ...order, status: "PENDING" }, session);
       }
       if (dto.status === "CANCELLED" && !order.shippedAt && order.voucherId) await this.discounts.releaseVoucher(order, session);
-      if ((dto.status === "SHIPPING" && !order.shippedAt) || (dto.status === "CANCELLED" && from !== "PENDING")) {
+      const release = ["PENDING", "CANCELLED", "RETURN_REQUESTED", "PARTIALLY_RETURNED", "RETURNED"].includes(dto.status) && !wasShipped && ["CONFIRMED", "PACKING"].includes(from);
+      if (ship || release) {
         for (const allocation of order.allocations) {
           const batch = await this.db.batches.findOne({ id: allocation.batchId }).session(session).lean();
           if (!batch) throw new ConflictException("BATCH_MISSING");
-          const shipping = dto.status === "SHIPPING";
+          const shipping = ship;
           if (shipping && (batch.status !== "AVAILABLE" || !batch.expiresAt || batch.expiresAt <= now)) throw new ConflictException("BATCH_UNSAFE");
           await this.move(actor, batch, shipping ? -allocation.qty : 0, -allocation.qty, shipping ? "STOCK_OUT" : "RELEASE", session, dto.reason, id, shipping ? now : undefined);
         }
-        if (dto.status === "SHIPPING") order.shippedAt = now;
+        if (ship) order.shippedAt = now;
+        if (release) { order.allocations = []; order.cogsVnd = 0; }
       }
       if (dto.status === "DELIVERED") order.deliveredAt = now;
       // Returns change workflow only. Physical return receipt requires an explicit inspected adjustment.
@@ -477,6 +479,18 @@ export class CommerceService {
       await this.audit(actor, "EXPENSE", entry.id, requestId, session); return { id: entry.id, amountVnd: entry.amountVnd };
     });
   }
+  async recalculateCommission(actor: Actor, id: string, expectedVersion: number, key: string, requestId: string) {
+    this.owner(actor);
+    return this.db.idempotent(`${actor.id}:recalculate-commission:${id}`, key, { expectedVersion }, async session => {
+      const order = await this.db.scopedOrder(id, {}, session);
+      this.version(order, expectedVersion);
+      if (!["DELIVERED", "PARTIALLY_RETURNED", "RETURNED"].includes(order.status)) throw new ConflictException("INVALID_STATE_TRANSITION");
+      await this.reconcile(order, actor, session);
+      await this.db.saveOrder(order, expectedVersion, session);
+      await this.audit(actor, "COMMISSION_RECALCULATED", id, requestId, session);
+      return { id, version: order.version, commissionVnd: order.commissionVnd };
+    });
+  }
   async finalizeCosts(actor: Actor, id: string, expectedVersion: number, key: string, requestId: string) {
     this.owner(actor);
     return this.db.idempotent(`${actor.id}:finalize-costs:${id}`, key, { expectedVersion }, async session => {
@@ -544,12 +558,17 @@ export class CommerceService {
     });
   }
   async dashboard(actor: Actor) {
-    const match = { ...orderScope(actor), deliveredAt: { $exists: true } };
+    const scope = orderScope(actor);
+    const match = { ...scope, deliveredAt: { $exists: true } };
     const [totals] = await this.db.orders.aggregate([{ $match: match }, { $group: { _id: null, deliveredOrders: { $sum: 1 }, revenueVnd: { $sum: { $subtract: [{ $add: ["$totalVnd", { $ifNull: ["$returnRefundsVnd", 0] }] }, { $add: ["$refundsVnd", { $ifNull: ["$returnValueVnd", 0] }] }] } }, cogsVnd: { $sum: "$cogsVnd" }, directCostsVnd: { $sum: "$directCostsVnd" }, commissionVnd: { $sum: "$commissionVnd" }, pendingCostOrders: { $sum: { $cond: ["$costsFinalized", 0, 1] } } } }]);
+    const processingOrders = await this.db.orders.countDocuments({
+      ...scope,
+      status: { $nin: ["DELIVERED", "CANCELLED", "RETURNED"] },
+    });
     const [cash] = actor.role === "OWNER_ADMIN" ? await this.db.ledger.aggregate([{ $group: { _id: null, cashMovementVnd: { $sum: { $switch: { branches: [{ case: { $eq: ["$kind", "PAYMENT"] }, then: "$amountVnd" }, { case: { $in: ["$kind", ["REFUND", "EXPENSE", "PAYOUT"]] }, then: { $multiply: ["$amountVnd", -1] } }], default: 0 } } }, overheadVnd: { $sum: { $cond: [{ $and: [{ $eq: ["$kind", "EXPENSE"] }, { $eq: ["$scope", "OVERHEAD"] }] }, "$amountVnd", 0] } } } }]) : [];
     const [losses] = actor.role === "OWNER_ADMIN" ? await this.db.orders.aggregate([{ $match: { deliveredAt: { $exists: false }, status: "RETURNED", shippedAt: { $exists: true } } }, { $group: { _id: null, inventoryLossVnd: { $sum: "$cogsVnd" }, directCostsVnd: { $sum: "$directCostsVnd" } } }]) : [];
     const failedDeliveryLossVnd = (losses?.inventoryLossVnd ?? 0) + (losses?.directCostsVnd ?? 0);
-    return { asOf: new Date().toISOString(), timezone: "Asia/Ho_Chi_Minh", deliveredOrders: totals?.deliveredOrders ?? 0, revenueVnd: totals?.revenueVnd ?? 0, commissionVnd: totals?.commissionVnd ?? 0, pendingCostOrders: totals?.pendingCostOrders ?? 0,
+    return { asOf: new Date().toISOString(), timezone: "Asia/Ho_Chi_Minh", deliveredOrders: totals?.deliveredOrders ?? 0, revenueVnd: totals?.revenueVnd ?? 0, commissionVnd: totals?.commissionVnd ?? 0, pendingCostOrders: processingOrders,
       ...(actor.role === "OWNER_ADMIN" ? { failedDeliveryLossVnd, failedDeliveryInventoryLossVnd: losses?.inventoryLossVnd ?? 0, failedDeliveryDirectCostsVnd: losses?.directCostsVnd ?? 0, cogsVnd: totals?.cogsVnd ?? 0, directCostsVnd: totals?.directCostsVnd ?? 0, overheadVnd: cash?.overheadVnd ?? 0, operatingCashMovementVnd: cash?.cashMovementVnd ?? 0, netProfitVnd: (totals?.revenueVnd ?? 0) - (totals?.cogsVnd ?? 0) - (totals?.directCostsVnd ?? 0) - (totals?.commissionVnd ?? 0) - (cash?.overheadVnd ?? 0) - failedDeliveryLossVnd } : {}) };
   }
   async getMediaState() {

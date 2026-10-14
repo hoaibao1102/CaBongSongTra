@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "./route";
+import fs from "fs";
 
 const request = (cookie?: string) => new Request("https://shop.test/api/media", {
   method: "POST",
@@ -10,6 +11,8 @@ const request = (cookie?: string) => new Request("https://shop.test/api/media", 
 describe("media persistence route", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.spyOn(fs, "writeFileSync").mockImplementation(() => {});
+    vi.spyOn(fs, "mkdirSync").mockImplementation(() => undefined);
     vi.stubEnv("API_INTERNAL_URL", "http://api.test/api/v1");
     vi.stubEnv("WEB_ORIGIN", "https://shop.test");
   });

@@ -704,7 +704,7 @@ export function InventoryManager({
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
             <label>
-              <span>{text(lang, "Ngày nhận hàng", "Received date")} *</span>
+              <span>{text(lang, "Ngày nhận hàng", "Received date")} <span className="required-mark" aria-hidden="true">*</span></span>
               <input
                 type="date"
                 required
@@ -927,7 +927,7 @@ export function InventoryManager({
 
           <div style={{ marginBottom: 16 }}>
             <label>
-              <span>{text(lang, "Chọn lô hàng cần giảm", "Select batch")} *</span>
+              <span>{text(lang, "Chọn lô hàng cần giảm", "Select batch")} <span className="required-mark" aria-hidden="true">*</span></span>
               <SearchableSelect
                 options={batches
                   .filter((b) => b.onHand - b.reserved > 0)
@@ -949,7 +949,7 @@ export function InventoryManager({
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
             <label>
-              <span>{text(lang, "Số lượng giảm", "Quantity to reduce")} *</span>
+              <span>{text(lang, "Số lượng giảm", "Quantity to reduce")} <span className="required-mark" aria-hidden="true">*</span></span>
               <input
                 type="number"
                 min={1}
@@ -960,7 +960,7 @@ export function InventoryManager({
             </label>
 
             <label>
-              <span>{text(lang, "Lý do điều chỉnh", "Reason")} *</span>
+              <span>{text(lang, "Lý do điều chỉnh", "Reason")} <span className="required-mark" aria-hidden="true">*</span></span>
               <select
                 value={adjustReason}
                 onChange={(e) => setAdjustReason(e.target.value)}

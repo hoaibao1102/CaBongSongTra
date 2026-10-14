@@ -21,7 +21,7 @@ const routes: [RegExp, string[]][] = [
   [/^orders$/, ["GET", "POST"]],
   [/^orders\/[0-9a-f-]{36}$/, ["GET", "PATCH"]],
   [
-    /^orders\/[0-9a-f-]{36}\/(?:transitions|payments|refunds|finalize-costs|assignment|returns)$/,
+    /^orders\/[0-9a-f-]{36}\/(?:transitions|payments|refunds|finalize-costs|recalculate-commission|assignment|returns)$/,
     ["POST"],
   ],
   [/^inventory\/(?:receipts|adjustments|purchase-receipts)$/, ["POST"]],

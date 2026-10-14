@@ -74,6 +74,98 @@ body {
 }
 
 /* Base Controls */
+.contact-buttons {
+  display: inline-flex;
+  align-items: center;
+  gap: 18px;
+  padding: 4px;
+}
+.contact-buttons--floating {
+  position: fixed;
+  right: max(24px, env(safe-area-inset-right));
+  bottom: max(28px, env(safe-area-inset-bottom));
+  flex-direction: column;
+  gap: 22px;
+  z-index: 90;
+}
+.contact-buttons .contact-icon {
+  --contact-color: #0875ff;
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  flex: 0 0 54px;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--contact-color);
+  box-shadow: 0 5px 16px color-mix(in srgb, var(--contact-color) 30%, transparent);
+  text-decoration: none;
+  transition: transform .2s ease;
+}
+.contact-buttons .contact-icon--phone { --contact-color: #169b58; }
+.contact-icon::before, .contact-icon::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--contact-color);
+  border-radius: inherit;
+  z-index: -1;
+  pointer-events: none;
+  animation: contact-ripple 3s ease-out infinite;
+}
+.contact-icon::after { animation-delay: 1.5s; }
+.contact-icon:hover { transform: translateY(-3px); }
+.contact-icon:focus-visible { outline: 3px solid #1c1917; outline-offset: 6px; }
+.contact-icon-art { display: grid; place-items: center; position: relative; }
+.contact-icon-art svg { fill: #fff; stroke: #fff; }
+.contact-zalo-word { position: absolute; top: 7px; color: #0875ff; font-size: 9px; font-weight: 800; letter-spacing: -.4px; }
+.contact-phone-art { animation: contact-ring 4s ease-in-out infinite; }
+.contact-tooltip {
+  position: absolute;
+  bottom: calc(100% + 14px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #292524;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s ease, transform .2s ease;
+}
+.contact-icon:hover .contact-tooltip, .contact-icon:focus-visible .contact-tooltip { opacity: 1; transform: translateX(-50%) translateY(0); }
+.contact-buttons--floating .contact-tooltip { bottom: auto; left: auto; right: calc(100% + 16px); transform: translateX(4px); }
+.contact-buttons--floating .contact-icon:hover .contact-tooltip, .contact-buttons--floating .contact-icon:focus-visible .contact-tooltip { transform: translateX(0); }
+@keyframes contact-ripple {
+  0% { transform: scale(1); opacity: .5; }
+  75%, 100% { transform: scale(1.5); opacity: 0; }
+}
+@keyframes contact-ring {
+  0%, 25%, 100% { transform: rotate(0); }
+  5%, 15% { transform: rotate(-14deg); }
+  10%, 20% { transform: rotate(14deg); }
+}
+@media (max-width: 600px) {
+  .contact-buttons--floating { right: 18px; bottom: calc(20px + env(safe-area-inset-bottom)); }
+  .contact-buttons--floating .contact-icon { width: 48px; height: 48px; flex-basis: 48px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .contact-icon::before, .contact-icon::after, .contact-phone-art { animation: none; }
+  .contact-icon::before, .contact-icon::after { display: none; }
+  .contact-buttons .contact-icon, .contact-tooltip { transition: none; }
+}
+
+.required-mark {
+  color: #dc2626 !important;
+  font-weight: 700;
+}
+
 button,
 input,
 select,
@@ -415,8 +507,9 @@ small {
 .hero-art {
   position: relative;
   overflow: hidden;
-  min-height: 380px;
-  max-height: 480px;
+  aspect-ratio: 3 / 2;
+  width: 100%;
+  min-width: 0;
   border-radius: var(--radius-xl);
   background: #fff;
   display: flex;
@@ -428,15 +521,28 @@ small {
 }
 
 .hero-art-img {
+  display: block;
   width: 100%;
   height: 100%;
-  max-height: 480px;
-  object-fit: contain;
-  transition: transform 0.4s ease;
+  object-fit: cover;
+  object-position: center;
 }
 
 .hero-art:hover .hero-art-img {
-  transform: scale(1.02);
+  transform: none;
+}
+
+.landing-image-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  box-sizing: border-box;
+  background: #f5f2ed;
+  color: #78716c;
+  text-align: center;
 }
 
 .hero-art-overlay {
@@ -2508,11 +2614,22 @@ fieldset .check + button {
 .area-chart-container {
   width: 100%;
   height: 230px;
+  overflow-x: auto;
 }
 
 .area-chart-svg {
   width: 100%;
+  min-width: 480px;
   height: 100%;
+}
+
+.sales-overview-card .card-header-flex {
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.sales-overview-card {
+  min-width: 0;
 }
 
 .chart-axis-label {
@@ -3181,7 +3298,7 @@ footer p {
     min-height: 420px;
   }
   .hero-art {
-    min-height: 320px;
+    min-height: 0;
   }
   .checkout {
     grid-template-columns: 1fr;
@@ -3468,7 +3585,7 @@ footer p {
     gap: 8px;
   }
   .hero-art {
-    min-height: 240px;
+    min-height: 0;
   }
 
   /* Strip grid 2x2 cards */

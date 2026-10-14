@@ -32,7 +32,20 @@ it("reclassifies prior goodwill transactionally when a full return would double-
 });
 it("subtracts failed-delivery inventory losses and direct costs from owner net profit", async () => {
   const aggregate = vi.fn().mockResolvedValueOnce([{ revenueVnd: 100000, cogsVnd: 50000 }]).mockResolvedValueOnce([{ inventoryLossVnd: 65000, directCostsVnd: 15000 }]);
-  const db = { orders: { aggregate }, ledger: { aggregate: vi.fn(async () => []) } };
+  const db = { orders: { aggregate, countDocuments: vi.fn(async () => 0) }, ledger: { aggregate: vi.fn(async () => []) } };
   const result = await new CommerceService(db as never).dashboard({ id: "owner", role: "OWNER_ADMIN" });
   expect(result).toMatchObject({ failedDeliveryLossVnd: 80000, netProfitVnd: -30000 });
+});
+it("excludes delivered orders from a member's processing dashboard count", async () => {
+  const countDocuments = vi.fn(async () => 2);
+  const db = {
+    orders: { aggregate: vi.fn(async () => []), countDocuments },
+    ledger: { aggregate: vi.fn(async () => []) },
+  };
+  const result = await new CommerceService(db as never).dashboard({ id: "member", role: "MEMBER" });
+  expect(countDocuments).toHaveBeenCalledWith({
+    responsibleMemberId: "member",
+    status: { $nin: ["DELIVERED", "CANCELLED", "RETURNED"] },
+  });
+  expect(result.pendingCostOrders).toBe(2);
 });

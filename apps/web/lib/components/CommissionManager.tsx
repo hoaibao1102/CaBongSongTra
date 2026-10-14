@@ -214,8 +214,8 @@ export function CommissionManager({
           value={money(kpis.totalAccrued, lang)}
           subtext={text(
             lang,
-            "Tính trên các đơn đã giao và thu đủ tiền",
-            "Eligible delivered & paid orders",
+            "Tính trên phần chênh lệch giá bán và giá vốn của đơn đã giao",
+            "Delivered-order selling price minus product cost",
           )}
           icon={BadgePercent}
           variant="brand"
@@ -485,7 +485,7 @@ export function CommissionManager({
 
           <div style={{ marginBottom: 16 }}>
             <label>
-              <span>{text(lang, "Thành viên nhận tiền", "Member recipient")} *</span>
+              <span>{text(lang, "Thành viên nhận tiền", "Member recipient")} <span className="required-mark" aria-hidden="true">*</span></span>
               <SearchableSelect
                 options={memberList.map((m) => {
                   const bal = Math.max(0, memberSummaries.get(m.id)?.balance ?? 0);
@@ -521,7 +521,7 @@ export function CommissionManager({
 
           <div style={{ marginBottom: 16 }}>
             <label>
-              <span>{text(lang, "Hình thức thanh toán", "Payout option")} *</span>
+              <span>{text(lang, "Hình thức thanh toán", "Payout option")} <span className="required-mark" aria-hidden="true">*</span></span>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 6 }}>
                 <button
                   type="button"
@@ -555,7 +555,7 @@ export function CommissionManager({
           {!isFullPayout && (
             <div style={{ marginBottom: 16 }}>
               <label>
-                <span>{text(lang, "Số tiền muốn chi trả (VND)", "Amount to pay (VND)")} *</span>
+                <span>{text(lang, "Số tiền muốn chi trả (VND)", "Amount to pay (VND)")} <span className="required-mark" aria-hidden="true">*</span></span>
                 <CurrencyInput
                   value={payoutAmount}
                   onChange={(val) => setPayoutAmount(val)}
@@ -569,7 +569,7 @@ export function CommissionManager({
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
             <label>
-              <span>{text(lang, "Phương thức", "Method")} *</span>
+              <span>{text(lang, "Phương thức", "Method")} <span className="required-mark" aria-hidden="true">*</span></span>
               <select
                 value={method}
                 onChange={(e) => setMethod(e.target.value as "BANK_TRANSFER" | "CASH")}
@@ -592,7 +592,7 @@ export function CommissionManager({
 
           <div style={{ marginBottom: 16 }}>
             <label>
-              <span>{text(lang, "Mã tham chiếu / Mã giao dịch", "Transaction Reference")} *</span>
+              <span>{text(lang, "Mã tham chiếu / Mã giao dịch", "Transaction Reference")} <span className="required-mark" aria-hidden="true">*</span></span>
               <input
                 type="text"
                 required

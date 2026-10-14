@@ -1,7 +1,7 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { ActionForm, Records, Storefront, Admin, ResetIssue, InternalOrderCreator } from "./screens";
+import { ActionForm, Records, Storefront, Admin, ResetIssue, InternalOrderCreator, MemberLeaderboardWidget } from "./screens";
 import { actions } from "../lib/commerce";
 import ProductDetail from "./products/[sku]/product-detail";
 
@@ -11,6 +11,19 @@ describe("bilingual usable screens", () => {
     expect(html).not.toContain("109,000");
     expect(html).toContain('name="voucherCode"');
     expect(html).toContain("Review price");
+  });
+  it("starts a new internal order with every product quantity at zero", () => {
+    const products = [
+      { sku: "CBST-300", name: "300g", netWeightG: 300, retailPriceVnd: 109000 },
+      { sku: "CBST-400", name: "400g", netWeightG: 400, retailPriceVnd: 139000 },
+      { sku: "CBST-600", name: "600g", netWeightG: 600, retailPriceVnd: 199000 },
+    ];
+    const html = renderToStaticMarkup(
+      <InternalOrderCreator actor={{ id: "member", role: "MEMBER" }} lang="vi" products={products} />,
+    );
+
+    expect(html.match(/class="stepper-input"[^>]*value="0"/g)).toHaveLength(3);
+    expect(html).not.toContain("product-picker-item active");
   });
   it("provides product detail loading and safety links without fabricated product data", () => {
     const html = renderToStaticMarkup(<ProductDetail sku="CBST-300" />);
@@ -60,6 +73,48 @@ describe("bilingual usable screens", () => {
       expect(html).not.toContain('textarea name="json"');
     },
   );
+  it("shows every updateable order status in the transition dropdown", () => {
+    const html = renderToStaticMarkup(
+      <ActionForm action="transition" lang="en" onSuccess={() => {}} />,
+    );
+    for (const status of [
+      "CONFIRMED",
+      "PACKING",
+      "SHIPPING",
+      "DELIVERED",
+      "CANCELLED",
+      "DELIVERY_FAILED",
+      "RETURN_REQUESTED",
+      "PARTIALLY_RETURNED",
+      "RETURNED",
+    ]) {
+      expect(html).toContain(`value="${status}"`);
+    }
+  });
+  it("shows member names and includes the admin's directly managed orders in KPI", () => {
+    const html = renderToStaticMarkup(
+      <MemberLeaderboardWidget
+        lang="vi"
+        actor={{ id: "admin-id", role: "OWNER_ADMIN" }}
+        users={[
+          {
+            id: "member-id",
+            displayName: "Nguyễn Văn An",
+            emailNormalized: "an@example.com",
+            role: "MEMBER",
+            status: "ACTIVE",
+          },
+        ]}
+        orders={[
+          { id: "one", responsibleMemberId: "member-id", status: "DELIVERED", totalVnd: 109000 },
+          { id: "two", responsibleMemberId: null, status: "DELIVERED", totalVnd: 139000 },
+        ]}
+      />,
+    );
+    expect(html).toContain("Nguyễn Văn An");
+    expect(html).toContain("Lê Phạm Hoài Bảo");
+    expect(html).not.toContain("member-id");
+  });
   it("hides owner-only screens and forms from members", () => {
     const html = renderToStaticMarkup(
       <Admin actor={{ id: "member", role: "MEMBER" }} lang="en" />,

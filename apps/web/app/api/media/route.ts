@@ -69,11 +69,13 @@ function getStoredData() {
 }
 
 export async function GET() {
-  const apiUrl = process.env.API_INTERNAL_URL;
+  const rawApiUrl = process.env.API_INTERNAL_URL?.trim().replace(/\/+$/, "");
+  const apiUrl = rawApiUrl && (rawApiUrl.endsWith("/api/v1") ? rawApiUrl : `${rawApiUrl}/api/v1`);
   if (apiUrl) {
     try {
       const res = await fetch(`${apiUrl}/media`, {
         cache: "no-store",
+        signal: AbortSignal.timeout(8000),
         headers: { Accept: "application/json" },
       });
       if (res.ok) {

@@ -353,7 +353,7 @@ export function ProductManager({
 
           <div style={{ marginBottom: 16 }}>
             <label>
-              <span>{text(lang, "Mã SKU", "SKU Code")} *</span>
+              <span>{text(lang, "Mã SKU", "SKU Code")} <span className="required-mark" aria-hidden="true">*</span></span>
               <div style={{ display: "flex", alignItems: "center", marginTop: 4 }}>
                 <span
                   style={{
@@ -398,7 +398,7 @@ export function ProductManager({
 
           <div style={{ marginBottom: 16 }}>
             <label>
-              <span>{text(lang, "Tên hiển thị sản phẩm", "Product display name")} *</span>
+              <span>{text(lang, "Tên hiển thị sản phẩm", "Product display name")} <span className="required-mark" aria-hidden="true">*</span></span>
               <input
                 type="text"
                 required
@@ -411,7 +411,7 @@ export function ProductManager({
 
           <div style={{ marginBottom: 16 }}>
             <label>
-              <span>{text(lang, "Giá bán niêm yết (VND)", "Retail Price (VND)")} *</span>
+              <span>{text(lang, "Giá bán niêm yết (VND)", "Retail Price (VND)")} <span className="required-mark" aria-hidden="true">*</span></span>
               <CurrencyInput
                 value={createPrice}
                 onChange={(val) => setCreatePrice(val)}
@@ -481,7 +481,7 @@ export function ProductManager({
 
             <div style={{ marginBottom: 16 }}>
               <label>
-                <span>{text(lang, "Tên hiển thị sản phẩm", "Product display name")} *</span>
+                <span>{text(lang, "Tên hiển thị sản phẩm", "Product display name")} <span className="required-mark" aria-hidden="true">*</span></span>
                 <input
                   type="text"
                   required
@@ -493,7 +493,7 @@ export function ProductManager({
 
             <div style={{ marginBottom: 16 }}>
               <label>
-                <span>{text(lang, "Giá bán niêm yết (VND)", "Retail Price (VND)")} *</span>
+                <span>{text(lang, "Giá bán niêm yết (VND)", "Retail Price (VND)")} <span className="required-mark" aria-hidden="true">*</span></span>
                 <CurrencyInput
                   value={editPrice}
                   onChange={(val) => setEditPrice(val)}

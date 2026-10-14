@@ -82,6 +82,7 @@ export class CommerceController {
   @Post("orders/:id/payments") payment(@Req() req: ApiRequest, @Param("id", new ParseUUIDPipe()) id: string, @Body() dto: PaymentDto) { return this.service.payment(req.actor, id, dto, requestKey(req), req.requestId); }
   @Owner() @Post("orders/:id/refunds") refund(@Req() req: ApiRequest, @Param("id", new ParseUUIDPipe()) id: string, @Body() dto: RefundDto) { return this.service.payment(req.actor, id, dto, requestKey(req), req.requestId, true); }
   @Owner() @Post("orders/:id/finalize-costs") costs(@Req() req: ApiRequest, @Param("id", new ParseUUIDPipe()) id: string, @Body() dto: CostsDto) { return this.service.finalizeCosts(req.actor, id, dto.expectedVersion, requestKey(req), req.requestId); }
+  @Owner() @Post("orders/:id/recalculate-commission") recalculateCommission(@Req() req: ApiRequest, @Param("id", new ParseUUIDPipe()) id: string, @Body() dto: CostsDto) { return this.service.recalculateCommission(req.actor, id, dto.expectedVersion, requestKey(req), req.requestId); }
   @Owner() @Post("inventory/receipts") receipt(@Req() req: ApiRequest, @Body() dto: ReceiptDto) { return this.service.receipt(req.actor, dto, requestKey(req), req.requestId); }
   @Owner() @Post("inventory/purchase-receipts") @ApiBody({ type: CreatePurchaseReceiptDto }) @ApiHeader({ name: "Idempotency-Key", required: true })
   purchaseReceipt(@Req() req: ApiRequest, @Body() dto: CreatePurchaseReceiptDto) { return this.service.createPurchaseReceipt(req.actor, dto, requestKey(req), req.requestId); }

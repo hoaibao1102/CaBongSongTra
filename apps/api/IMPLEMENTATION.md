@@ -67,14 +67,20 @@ DELIVERED. No database or external credentials were used during implementation.
   later request competing for the final unit.
 - Delivery never records a payment. COD_SETTLEMENT means actual shop receipt,
   not money still held by a courier.
-- Commission is pending until delivered, fully received and costs finalized.
+- Commission accrues on successful delivery from product margin (selling price minus actual batch COGS).
   Rate is snapshotted at 4000 basis points. Owner/guest direct orders accrue none.
 - Return workflow states do not silently restore stock or refund money. Owner-only
   `POST /orders/:id/returns` requires inspection evidence, batch quantities and a
   RESTOCK/DISCARD decision. Cumulative returned quantities cannot exceed shipped
   allocations. Restocking requires an available, labelled, unexpired original batch;
-  discarded goods do not restore stock or reverse COGS. Direct transitions to
-  PARTIALLY_RETURNED/RETURNED are blocked; intake derives those states.
+  discarded goods do not restore stock or reverse COGS. Owners may directly correct
+  any workflow status, including PARTIALLY_RETURNED/RETURNED; these corrections
+  do not record a physical return or a cash refund. Intake remains available after
+  a RETURNED correction and validates outstanding shipped quantities.
+- Owner shortcuts reserve and ship stock when those steps have not occurred;
+  reverting an unshipped order releases reservations. Historical shipments are
+  not repeated or silently reversed. Member transitions retain the workflow graph.
+  Reopening a cancelled voucher order remains subject to voucher lifecycle checks.
 - Intake appends RETURN_CREDIT and (for restocked goods) COGS_REVERSAL entries using
   historical price/cost snapshots. Cash refund remains separate. Set refund
   `purpose=RETURN` to settle issued return credit without double-reducing revenue;

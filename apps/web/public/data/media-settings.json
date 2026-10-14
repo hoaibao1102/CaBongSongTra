@@ -1,7 +1,70 @@
 {
   "images": {
-    "hero": "https://example.test/hero.webp"
+    "bang-size": "https://res.cloudinary.com/dbqaiybhl/image/upload/v1791744608/cbst/ysj1tmxf53g41qqwdme0.png",
+    "hero-banner": "https://res.cloudinary.com/dbqaiybhl/image/upload/v1791744558/cbst/b4uowt6lnneqhnzt4ruv.webp",
+    "group-3": "https://res.cloudinary.com/dbqaiybhl/image/upload/v1791744608/cbst/ysj1tmxf53g41qqwdme0.png",
+    "CBST-400": "https://res.cloudinary.com/dbqaiybhl/image/upload/v1791744509/cbst/pinleuuq1x232riodz6b.png",
+    "CBST-600": "https://res.cloudinary.com/dbqaiybhl/image/upload/v1791744450/cbst/luekeni8nuhfg9tdntlk.png",
+    "CBST-300": "https://res.cloudinary.com/dbqaiybhl/image/upload/v1791744534/cbst/m2th2vxz9ok3mybgnemn.png",
+    "zalo-qr": "https://res.cloudinary.com/dbqaiybhl/image/upload/v1791744401/cbst/jfsowv01bcp25j7ascgh.jpg",
+    "bang-gia": "https://res.cloudinary.com/dbqaiybhl/image/upload/v1791744429/cbst/kbnfw8sufi9okwku9cii.png"
   },
-  "gallery": [],
-  "updatedAt": "2026-10-13T03:01:31.552Z"
+  "gallery": [
+    {
+      "id": "media-1791880732713",
+      "url": "https://res.cloudinary.com/dbqaiybhl/image/upload/v1791744429/cbst/kbnfw8sufi9okwku9cii.png",
+      "title": "báº£ng giÃ¡",
+      "tag": "bang-gia",
+      "description": "",
+      "createdAt": "2026-10-13"
+    },
+    {
+      "id": "media-1791880693581",
+      "url": "https://res.cloudinary.com/dbqaiybhl/image/upload/v1791744401/cbst/jfsowv01bcp25j7ascgh.jpg",
+      "title": "zalo",
+      "tag": "zalo-qr",
+      "description": "",
+      "createdAt": "2026-10-13"
+    },
+    {
+      "id": "media-1791880661804",
+      "url": "https://res.cloudinary.com/dbqaiybhl/image/upload/v1791744534/cbst/m2th2vxz9ok3mybgnemn.png",
+      "title": "size nhá»",
+      "tag": "CBST-300",
+      "description": "",
+      "createdAt": "2026-10-13"
+    },
+    {
+      "id": "media-1791880634006",
+      "url": "https://res.cloudinary.com/dbqaiybhl/image/upload/v1791744450/cbst/luekeni8nuhfg9tdntlk.png",
+      "title": "size lá»n",
+      "tag": "CBST-600",
+      "description": "",
+      "createdAt": "2026-10-13"
+    },
+    {
+      "id": "media-1791880605251",
+      "url": "https://res.cloudinary.com/dbqaiybhl/image/upload/v1791744509/cbst/pinleuuq1x232riodz6b.png",
+      "title": "size vá»«a",
+      "tag": "CBST-400",
+      "description": "",
+      "createdAt": "2026-10-13"
+    },
+    {
+      "id": "media-1791880301215",
+      "url": "https://res.cloudinary.com/dbqaiybhl/image/upload/v1791744558/cbst/b4uowt6lnneqhnzt4ruv.webp",
+      "title": "banner",
+      "tag": "hero-pot",
+      "description": "",
+      "createdAt": "2026-10-13"
+    },
+    {
+      "id": "media-1791880239271",
+      "url": "https://res.cloudinary.com/dbqaiybhl/image/upload/v1791744608/cbst/ysj1tmxf53g41qqwdme0.png",
+      "title": "báº£ng size",
+      "tag": "bang-size",
+      "description": "",
+      "createdAt": "2026-10-13"
+    }
+  ]
 }
