@@ -199,3 +199,28 @@ export class BulkAssignMediaSlotsDto {
   @ApiPropertyOptional({ type: Object }) @IsOptional() images?: Record<string, string>;
   @ApiPropertyOptional({ type: Array }) @IsOptional() gallery?: unknown[];
 }
+
+export class KpiTierDto {
+  @ApiProperty({ type: Number, minimum: 1 }) @IsInt() @Min(1) minQty!: number;
+  @ApiProperty({ type: Number, minimum: 0 }) @IsInt() @Min(0) @Max(1000000000) bonusVnd!: number;
+}
+
+export class CreateKpiPolicyDto {
+  @ApiProperty({ type: String, maxLength: 200 }) @IsString() @MinLength(1) @MaxLength(200) name!: string;
+  @ApiProperty({ enum: ["MONTHLY", "WEEKLY", "CUSTOM"] }) @IsIn(["MONTHLY", "WEEKLY", "CUSTOM"]) periodType!: "MONTHLY" | "WEEKLY" | "CUSTOM";
+  @ApiPropertyOptional({ enum: ["PRODUCT_QTY", "REVENUE"] }) @IsOptional() @IsIn(["PRODUCT_QTY", "REVENUE"]) metric?: "PRODUCT_QTY" | "REVENUE";
+  @ApiProperty({ type: [KpiTierDto] }) @IsArray() @ArrayMinSize(1) @ValidateNested({ each: true }) @Type(() => KpiTierDto) tiers!: KpiTierDto[];
+  @ApiPropertyOptional({ type: Boolean }) @IsOptional() @IsBoolean() active?: boolean;
+}
+
+export class CreateKpiPeriodDto {
+  @ApiProperty({ type: String }) @IsUUID() policyId!: string;
+  @ApiProperty({ type: String, maxLength: 200 }) @IsString() @MinLength(1) @MaxLength(200) name!: string;
+  @ApiProperty({ type: String }) @IsISO8601() startDate!: string;
+  @ApiProperty({ type: String }) @IsISO8601() endDate!: string;
+}
+
+export class SettleKpiPeriodDto {
+  @ApiPropertyOptional({ type: String, maxLength: 300 }) @IsOptional() @IsString() @MaxLength(300) note?: string;
+}
+

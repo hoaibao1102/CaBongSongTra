@@ -3,7 +3,7 @@ import type { Response } from "express";
 import { AuthService } from "../auth/auth.service";
 import { CommerceService } from "./service";
 import { MongoRepository } from "./repository";
-import { AdjustmentDto, CheckoutDto, CostsDto, CreateUserDto, ExpenseDto, LoginDto, PageDto, PaymentDto, PayoutDto, ProductDto, ReceiptDto, RefundDto, TransitionDto, UserStatusDto, CreatePurchaseReceiptDto, UpdateCommissionRateDto, UpdateBankInfoDto } from "./dto";
+import { AdjustmentDto, CheckoutDto, CostsDto, CreateUserDto, ExpenseDto, LoginDto, PageDto, PaymentDto, PayoutDto, ProductDto, ReceiptDto, RefundDto, TransitionDto, UserStatusDto, CreatePurchaseReceiptDto, UpdateCommissionRateDto, UpdateBankInfoDto, CreateKpiPolicyDto, CreateKpiPeriodDto, SettleKpiPeriodDto } from "./dto";
 import { Owner, Public, requestKey, type ApiRequest } from "./http";
 import { AssignOrderDto, CreateProductDto, EditOrderDto, ResetPasswordDto, ReturnDto } from "./dto";
 import { PasswordResetService } from "./password-reset";
@@ -99,9 +99,16 @@ export class CommerceController {
   updateBankInfo(@Req() req: ApiRequest, @Param("id", new ParseUUIDPipe()) id: string, @Body() dto: UpdateBankInfoDto) { return this.service.updateBankInfo(req.actor, id, dto, requestKey(req), req.requestId); }
   @Owner() @Post("expenses") expense(@Req() req: ApiRequest, @Body() dto: ExpenseDto) { return this.service.expense(req.actor, dto, requestKey(req), req.requestId); }
   @Owner() @Get("expenses") expenses(@Query() query: PageDto) { const { page, limit } = pagination(query); return this.db.ledger.find({ kind: "EXPENSE" }, { _id: 0, id: 1, orderId: 1, amountVnd: 1, scope: 1, category: 1, reason: 1, createdAt: 1, actorId: 1 }).sort({ createdAt: -1, id: 1 }).skip(page * limit).limit(limit).lean(); }
-  @Get("commissions/me") commissionsMe(@Req() req: ApiRequest, @Query() query: PageDto) { const { page, limit } = pagination(query); return this.db.ledger.find({ memberId: req.actor.id, kind: { $in: ["COMMISSION", "PAYOUT"] } }, { _id: 0, id: 1, orderId: 1, kind: 1, amountVnd: 1, createdAt: 1 }).sort({ createdAt: -1, id: 1 }).skip(page * limit).limit(limit).lean(); }
-  @Owner() @Get("commissions") commissions(@Query() query: PageDto) { const { page, limit } = pagination(query); return this.db.ledger.find({ kind: { $in: ["COMMISSION", "PAYOUT"] } }, { _id: 0, id: 1, memberId: 1, orderId: 1, kind: 1, amountVnd: 1, createdAt: 1 }).sort({ createdAt: -1, id: 1 }).skip(page * limit).limit(limit).lean(); }
+  @Get("commissions/me") commissionsMe(@Req() req: ApiRequest, @Query() query: PageDto) { const { page, limit } = pagination(query); return this.db.ledger.find({ memberId: req.actor.id, kind: { $in: ["COMMISSION", "PAYOUT", "KPI_BONUS"] } }, { _id: 0, id: 1, orderId: 1, kind: 1, amountVnd: 1, reason: 1, reference: 1, createdAt: 1 }).sort({ createdAt: -1, id: 1 }).skip(page * limit).limit(limit).lean(); }
+  @Owner() @Get("commissions") commissions(@Query() query: PageDto) { const { page, limit } = pagination(query); return this.db.ledger.find({ kind: { $in: ["COMMISSION", "PAYOUT", "KPI_BONUS"] } }, { _id: 0, id: 1, memberId: 1, orderId: 1, kind: 1, amountVnd: 1, reason: 1, reference: 1, createdAt: 1 }).sort({ createdAt: -1, id: 1 }).skip(page * limit).limit(limit).lean(); }
   @Owner() @Post("commissions/payouts") payout(@Req() req: ApiRequest, @Body() dto: PayoutDto) { return this.service.payout(req.actor, dto.memberId, dto.reference, requestKey(req), req.requestId, dto.amountVnd, dto.period, dto.note); }
+  @Owner() @Get("kpi/policies") getKpiPolicies(@Req() req: ApiRequest) { return this.service.getKpiPolicies(req.actor); }
+  @Owner() @Post("kpi/policies") createKpiPolicy(@Req() req: ApiRequest, @Body() dto: CreateKpiPolicyDto) { return this.service.createKpiPolicy(req.actor, dto, requestKey(req), req.requestId); }
+  @Owner() @Get("kpi/periods") getKpiPeriods(@Req() req: ApiRequest) { return this.service.getKpiPeriods(req.actor); }
+  @Owner() @Post("kpi/periods") createKpiPeriod(@Req() req: ApiRequest, @Body() dto: CreateKpiPeriodDto) { return this.service.createKpiPeriod(req.actor, dto, requestKey(req), req.requestId); }
+  @Owner() @Get("kpi/periods/:id/preview") previewKpiPeriod(@Req() req: ApiRequest, @Param("id", new ParseUUIDPipe()) id: string) { return this.service.previewKpiPeriod(req.actor, id); }
+  @Owner() @Post("kpi/periods/:id/settle") settleKpiPeriod(@Req() req: ApiRequest, @Param("id", new ParseUUIDPipe()) id: string, @Body() dto: SettleKpiPeriodDto) { return this.service.settleKpiPeriod(req.actor, id, dto, requestKey(req), req.requestId); }
+  @Get("kpi/me") getMyKpiProgress(@Req() req: ApiRequest) { return this.service.getMyKpiProgress(req.actor); }
   @Owner() @Get("audit-logs") audit(@Query() query: PageDto) { const { page, limit } = pagination(query); return this.db.audit.find({}, { _id: 0, id: 1, actorId: 1, action: 1, entityId: 1, requestId: 1, from: 1, to: 1, createdAt: 1 }).sort({ createdAt: -1, id: 1 }).skip(page * limit).limit(limit).lean(); }
   @Owner() @Get("dashboard/overview") dashboard(@Req() req: ApiRequest) { return this.service.dashboard(req.actor); }
   @Get("dashboard/members/me") memberDashboard(@Req() req: ApiRequest) { return this.service.dashboard({ ...req.actor, role: "MEMBER" }); }

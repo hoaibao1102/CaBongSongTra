@@ -41,7 +41,7 @@ export interface PurchaseReceipt {
   createdAt: Date;
 }
 export interface Movement { id: string; batchId: string; sku: string; orderId?: string; type: string; reason: string; qtyDelta: number; reservedDelta: number; actorId: string; createdAt: Date }
-export interface Ledger { id: string; kind: "PAYMENT" | "REFUND" | "EXPENSE" | "COMMISSION" | "PAYOUT" | "RETURN_CREDIT" | "COGS_REVERSAL" | "REFUND_RECLASSIFICATION"; orderId?: string; memberId?: string; amountVnd: number; scope?: string; category?: string; method?: string; reference?: string; reason?: string; actorId: string; createdAt: Date }
+export interface Ledger { id: string; kind: "PAYMENT" | "REFUND" | "EXPENSE" | "COMMISSION" | "PAYOUT" | "RETURN_CREDIT" | "COGS_REVERSAL" | "REFUND_RECLASSIFICATION" | "KPI_BONUS"; orderId?: string; memberId?: string; amountVnd: number; scope?: string; category?: string; method?: string; reference?: string; reason?: string; actorId: string; createdAt: Date }
 export interface Audit { id: string; actorId: string; action: string; entityId: string; requestId: string; from?: string; to?: string; createdAt: Date }
 export interface Idempotency { scope: string; keyHash: string; requestHash: string; response: unknown }
 export interface Balance { memberId: string; balanceVnd: number }
@@ -130,7 +130,7 @@ purchaseReceiptSchema.index({ receivedAt: -1, createdAt: -1 });
 export const movementSchema = new Schema<Movement>({ id, batchId: { type: String, required: true, index: true }, sku: { type: String, required: true }, orderId: { type: String, index: true }, type: { type: String, required: true }, reason: { type: String, required: true }, qtyDelta: integer, reservedDelta: integer, actorId: { type: String, required: true }, createdAt: { type: Date, required: true } }, options);
 export const ledgerSchema = new Schema<Ledger>({ id, kind: { type: String, required: true, enum: ["PAYMENT", "REFUND", "EXPENSE", "COMMISSION", "PAYOUT"] }, orderId: String, memberId: String, amountVnd: integer, scope: String, category: String, method: String, reference: String, reason: String, actorId: { type: String, required: true }, createdAt: { type: Date, required: true } }, options);
 ledgerSchema.index({ memberId: 1, kind: 1, createdAt: -1 });
-(ledgerSchema.path("kind") as Schema.Types.String).enum({ values: ["PAYMENT", "REFUND", "EXPENSE", "COMMISSION", "PAYOUT", "RETURN_CREDIT", "COGS_REVERSAL", "REFUND_RECLASSIFICATION"] });
+(ledgerSchema.path("kind") as Schema.Types.String).enum({ values: ["PAYMENT", "REFUND", "EXPENSE", "COMMISSION", "PAYOUT", "RETURN_CREDIT", "COGS_REVERSAL", "REFUND_RECLASSIFICATION", "KPI_BONUS"] });
 ledgerSchema.index({ orderId: 1, createdAt: -1 });
 ledgerSchema.index({ kind: 1, createdAt: -1 });
 export const auditSchema = new Schema<Audit>({ id, actorId: { type: String, required: true }, action: { type: String, required: true }, entityId: { type: String, required: true }, requestId: { type: String, required: true }, from: String, to: String, createdAt: { type: Date, required: true } }, options);
@@ -231,3 +231,97 @@ export const mediaSlotSchema = new Schema<MediaSlot>(
   },
   options,
 );
+
+export interface KpiTier {
+  minQty: number;
+  bonusVnd: number;
+}
+
+export interface KpiPolicy {
+  id: string;
+  name: string;
+  periodType: "MONTHLY" | "WEEKLY" | "CUSTOM";
+  metric: "PRODUCT_QTY" | "REVENUE";
+  tiers: KpiTier[];
+  active: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface KpiPeriod {
+  id: string;
+  policyId: string;
+  name: string;
+  startDate: Date;
+  endDate: Date;
+  status: "OPEN" | "SETTLED";
+  settledAt?: Date;
+  settledBy?: string;
+  createdAt: Date;
+}
+
+export interface KpiAward {
+  id: string;
+  periodId: string;
+  memberId: string;
+  totalDeliveredQty: number;
+  achievedTierQty?: number;
+  bonusVnd: number;
+  ledgerEntryId?: string;
+  createdAt: Date;
+}
+
+const kpiTierSchema = new Schema(
+  {
+    minQty: { ...integer, min: 1 },
+    bonusVnd: nonnegative,
+  },
+  { _id: false, strict: "throw" },
+);
+
+export const kpiPolicySchema = new Schema<KpiPolicy>(
+  {
+    id,
+    name: { type: String, required: true },
+    periodType: { type: String, required: true, enum: ["MONTHLY", "WEEKLY", "CUSTOM"] },
+    metric: { type: String, required: true, enum: ["PRODUCT_QTY", "REVENUE"], default: "PRODUCT_QTY" },
+    tiers: { type: [kpiTierSchema], required: true },
+    active: { type: Boolean, required: true, default: true },
+    createdAt: { type: Date, required: true },
+    updatedAt: { type: Date, required: true },
+  },
+  options,
+);
+kpiPolicySchema.index({ active: 1, createdAt: -1 });
+
+export const kpiPeriodSchema = new Schema<KpiPeriod>(
+  {
+    id,
+    policyId: { type: String, required: true, index: true },
+    name: { type: String, required: true },
+    startDate: { type: Date, required: true },
+    endDate: { type: Date, required: true },
+    status: { type: String, required: true, enum: ["OPEN", "SETTLED"], default: "OPEN" },
+    settledAt: Date,
+    settledBy: String,
+    createdAt: { type: Date, required: true },
+  },
+  options,
+);
+kpiPeriodSchema.index({ status: 1, startDate: -1 });
+
+export const kpiAwardSchema = new Schema<KpiAward>(
+  {
+    id,
+    periodId: { type: String, required: true, index: true },
+    memberId: { type: String, required: true, index: true },
+    totalDeliveredQty: nonnegative,
+    achievedTierQty: { ...nonnegative, required: false },
+    bonusVnd: nonnegative,
+    ledgerEntryId: String,
+    createdAt: { type: Date, required: true },
+  },
+  options,
+);
+kpiAwardSchema.index({ periodId: 1, memberId: 1 }, { unique: true });
+
