@@ -110,3 +110,49 @@ export type MemberUser = {
     note?: string;
   };
 };
+
+export type KpiTier = {
+  minQty: number;
+  bonusVnd: number;
+};
+
+export type KpiPolicy = {
+  id: string;
+  name: string;
+  periodType: "MONTHLY" | "WEEKLY" | "CUSTOM";
+  metric: "PRODUCT_QTY" | "REVENUE";
+  tiers: KpiTier[];
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type KpiPeriod = {
+  id: string;
+  policyId: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  status: "OPEN" | "SETTLED";
+  settledAt?: string;
+  settledBy?: string;
+  createdAt: string;
+};
+
+export type KpiProgress = {
+  hasActivePeriod: boolean;
+  period?: KpiPeriod;
+  policy?: {
+    id: string;
+    name: string;
+    periodType: "MONTHLY" | "WEEKLY" | "CUSTOM";
+    tiers: KpiTier[];
+  };
+  currentQty?: number;
+  achievedTier?: KpiTier | null;
+  currentBonusVnd?: number;
+  nextTier?: KpiTier | null;
+  remainingQtyToNextTier?: number;
+  progressPercent?: number;
+};
+

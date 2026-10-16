@@ -32,6 +32,9 @@ const routes: [RegExp, string[]][] = [
   [/^expenses$/, ["GET", "POST"]],
   [/^commissions(?:\/me)?$/, ["GET"]],
   [/^commissions\/payouts$/, ["POST"]],
+  [/^kpi\/(?:policies|periods)$/, ["GET", "POST"]],
+  [/^kpi\/periods\/[0-9a-f-]{36}\/(?:preview|settle)$/, ["GET", "POST"]],
+  [/^kpi\/me$/, ["GET"]],
   [/^(?:audit-logs|dashboard\/overview|dashboard\/members\/me)$/, ["GET"]],
 ];
 export async function proxy(

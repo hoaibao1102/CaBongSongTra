@@ -10,6 +10,7 @@ export class MongoRepository implements AuthRepository {
   readonly users; readonly sessions; readonly products; readonly orders; readonly batches; readonly movements; readonly ledger; readonly audit; readonly keys; readonly balances; readonly rates;
   readonly resets; readonly mediaAssets; readonly mediaSlots; readonly purchaseReceipts;
   readonly promotions; readonly vouchers; readonly voucherRedemptions; readonly voucherCustomerCounters;
+  readonly kpiPolicies; readonly kpiPeriods; readonly kpiAwards;
   constructor(@InjectConnection() private readonly connection: Connection) {
     this.users = connection.model("V2User", schemas.userSchema, "users");
     this.sessions = connection.model("V2Session", schemas.sessionSchema, "sessions");
@@ -30,6 +31,9 @@ export class MongoRepository implements AuthRepository {
     this.vouchers = connection.model("V2Voucher", schemas.voucherSchema, "vouchers");
     this.voucherRedemptions = connection.model("V2VoucherRedemption", schemas.voucherRedemptionSchema, "voucherRedemptions");
     this.voucherCustomerCounters = connection.model("V2VoucherCustomerCounter", schemas.voucherCustomerCounterSchema, "voucherCustomerCounters");
+    this.kpiPolicies = connection.model("V2KpiPolicy", schemas.kpiPolicySchema, "kpiPolicies");
+    this.kpiPeriods = connection.model("V2KpiPeriod", schemas.kpiPeriodSchema, "kpiPeriods");
+    this.kpiAwards = connection.model("V2KpiAward", schemas.kpiAwardSchema, "kpiAwards");
   }
   async transaction<T>(work: (session: ClientSession) => Promise<T>): Promise<T> {
     const session = await this.connection.startSession();

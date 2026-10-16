@@ -6,8 +6,8 @@ import { MongoRepository } from "./repository";
 import { computePricing, returnCredit, safeQuote } from "./pricing";
 import { DiscountsService } from "./discounts";
 import { commissionTarget, orderProjection, orderScope, paymentDue, type Actor } from "./policy";
-import type { AdjustmentDto, CheckoutDto, CreateUserDto, ExpenseDto, PaymentDto, ProductDto, ReceiptDto, RefundDto, TransitionDto, CreatePurchaseReceiptDto, UpdateCommissionRateDto, UpdateBankInfoDto } from "./dto";
-import type { Batch, Ledger, Order, Product, PurchaseReceipt, PurchaseReceiptItem } from "./models";
+import type { AdjustmentDto, CheckoutDto, CreateUserDto, ExpenseDto, PaymentDto, ProductDto, ReceiptDto, RefundDto, TransitionDto, CreatePurchaseReceiptDto, UpdateCommissionRateDto, UpdateBankInfoDto, CreateKpiPolicyDto, CreateKpiPeriodDto, SettleKpiPeriodDto } from "./dto";
+import type { Batch, Ledger, Order, Product, PurchaseReceipt, PurchaseReceiptItem, KpiPolicy, KpiPeriod, KpiAward, KpiTier } from "./models";
 import type { InternalCheckoutDto, InternalQuoteDto, PublicQuoteDto } from "./dto";
 import type { AssignOrderDto, CreateProductDto, EditOrderDto, ReturnDto } from "./dto";
 
@@ -676,4 +676,241 @@ export class CommerceService {
     await this.db.mediaAssets.deleteOne({ id });
     return { success: true, id };
   }
+
+  async getKpiPolicies(actor: Actor) {
+    return this.db.kpiPolicies.find().sort({ createdAt: -1 }).lean();
+  }
+
+  async createKpiPolicy(actor: Actor, dto: CreateKpiPolicyDto, key: string, requestId: string) {
+    this.owner(actor);
+    const sortedTiers = [...dto.tiers].sort((a, b) => a.minQty - b.minQty);
+    return this.db.idempotent(`${actor.id}:create-kpi-policy`, key, dto, async session => {
+      const policy: KpiPolicy = {
+        id: randomUUID(),
+        name: dto.name.trim(),
+        periodType: dto.periodType,
+        metric: dto.metric || "PRODUCT_QTY",
+        tiers: sortedTiers,
+        active: dto.active !== false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      await this.db.kpiPolicies.create([policy], { session });
+      await this.audit(actor, "KPI_POLICY_CREATED", policy.id, requestId, session);
+      return policy;
+    });
+  }
+
+  async getKpiPeriods(actor: Actor) {
+    return this.db.kpiPeriods.find().sort({ startDate: -1 }).lean();
+  }
+
+  async createKpiPeriod(actor: Actor, dto: CreateKpiPeriodDto, key: string, requestId: string) {
+    this.owner(actor);
+    const startDate = new Date(dto.startDate);
+    const endDate = new Date(dto.endDate);
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime()) || startDate >= endDate) {
+      throw new BadRequestException("INVALID_DATE_RANGE");
+    }
+    return this.db.idempotent(`${actor.id}:create-kpi-period`, key, dto, async session => {
+      const policy = await this.db.kpiPolicies.findOne({ id: dto.policyId }).session(session).lean();
+      if (!policy) throw new NotFoundException("KPI_POLICY_NOT_FOUND");
+      const period: KpiPeriod = {
+        id: randomUUID(),
+        policyId: dto.policyId,
+        name: dto.name.trim(),
+        startDate,
+        endDate,
+        status: "OPEN",
+        createdAt: new Date(),
+      };
+      await this.db.kpiPeriods.create([period], { session });
+      await this.audit(actor, "KPI_PERIOD_CREATED", period.id, requestId, session);
+      return period;
+    });
+  }
+
+  async computeDeliveredQty(memberId: string, startDate: Date, endDate: Date, session?: ClientSession) {
+    const orders = await this.db.orders.find({
+      responsibleMemberId: memberId,
+      status: { $in: ["DELIVERED", "PARTIALLY_RETURNED"] },
+      $or: [
+        { deliveredAt: { $gte: startDate, $lte: endDate } },
+        { deliveredAt: { $exists: false }, createdAt: { $gte: startDate, $lte: endDate } },
+      ],
+    }).session(session ?? null).lean();
+
+    let totalDeliveredQty = 0;
+    for (const order of orders) {
+      const lineQty = (order.items || []).reduce((s: number, it: { qty?: number }) => s + (it.qty || 0), 0);
+      const returnedQty = (order.allocations || []).reduce((s: number, al: { returnedQty?: number }) => s + (al.returnedQty || 0), 0);
+      totalDeliveredQty += Math.max(0, lineQty - returnedQty);
+    }
+    return { totalDeliveredQty };
+  }
+
+  evaluateKpi(policy: KpiPolicy, totalQty: number) {
+    const sorted = [...policy.tiers].sort((a, b) => b.minQty - a.minQty);
+    const achieved = sorted.find(t => totalQty >= t.minQty) || null;
+    return {
+      achievedTier: achieved,
+      bonusVnd: achieved ? achieved.bonusVnd : 0,
+    };
+  }
+
+  async previewKpiPeriod(actor: Actor, periodId: string) {
+    this.owner(actor);
+    const period = await this.db.kpiPeriods.findOne({ id: periodId }).lean();
+    if (!period) throw new NotFoundException("KPI_PERIOD_NOT_FOUND");
+    const policy = await this.db.kpiPolicies.findOne({ id: period.policyId }).lean();
+    if (!policy) throw new NotFoundException("KPI_POLICY_NOT_FOUND");
+
+    const members = await this.db.users.find({ role: "MEMBER" }, { _id: 0, id: 1, displayName: 1, emailNormalized: 1, status: 1 }).lean();
+    const awards = period.status === "SETTLED" ? await this.db.kpiAwards.find({ periodId }).lean() : [];
+    const awardMap = new Map(awards.map(a => [a.memberId, a]));
+
+    const memberResults = await Promise.all(
+      members.map(async member => {
+        const existingAward = awardMap.get(member.id);
+        if (existingAward) {
+          return {
+            memberId: member.id,
+            displayName: member.displayName,
+            email: member.emailNormalized,
+            deliveredQty: existingAward.totalDeliveredQty,
+            achievedTierQty: existingAward.achievedTierQty ?? null,
+            bonusVnd: existingAward.bonusVnd,
+            settled: true,
+          };
+        }
+        const { totalDeliveredQty } = await this.computeDeliveredQty(member.id, period.startDate, period.endDate);
+        const { achievedTier, bonusVnd } = this.evaluateKpi(policy, totalDeliveredQty);
+        return {
+          memberId: member.id,
+          displayName: member.displayName,
+          email: member.emailNormalized,
+          deliveredQty: totalDeliveredQty,
+          achievedTierQty: achievedTier?.minQty ?? null,
+          bonusVnd,
+          settled: false,
+        };
+      })
+    );
+
+    return {
+      period,
+      policy,
+      members: memberResults,
+      totalBonusVnd: memberResults.reduce((s: number, m: { bonusVnd: number }) => s + m.bonusVnd, 0),
+    };
+  }
+
+  async settleKpiPeriod(actor: Actor, periodId: string, dto: SettleKpiPeriodDto, key: string, requestId: string) {
+    this.owner(actor);
+    return this.db.idempotent(`${actor.id}:settle-kpi:${periodId}`, key, dto, async session => {
+      const period = await this.db.kpiPeriods.findOne({ id: periodId }).session(session).lean();
+      if (!period) throw new NotFoundException("KPI_PERIOD_NOT_FOUND");
+      if (period.status === "SETTLED") throw new ConflictException("KPI_PERIOD_ALREADY_SETTLED");
+      const policy = await this.db.kpiPolicies.findOne({ id: period.policyId }).session(session).lean();
+      if (!policy) throw new NotFoundException("KPI_POLICY_NOT_FOUND");
+
+      const members = await this.db.users.find({ role: "MEMBER" }).session(session).lean();
+      const awards: KpiAward[] = [];
+
+      for (const member of members) {
+        const { totalDeliveredQty } = await this.computeDeliveredQty(member.id, period.startDate, period.endDate, session);
+        const { achievedTier, bonusVnd } = this.evaluateKpi(policy, totalDeliveredQty);
+
+        if (bonusVnd > 0) {
+          const entry = await this.entry(actor, {
+            kind: "KPI_BONUS",
+            memberId: member.id,
+            amountVnd: bonusVnd,
+            reason: dto?.note ? `${dto.note} (${period.name})` : `Thưởng KPI: ${period.name}`,
+          }, session);
+
+          await this.db.balances.updateOne(
+            { memberId: member.id },
+            { $inc: { balanceVnd: bonusVnd } },
+            { session, upsert: true }
+          );
+
+          awards.push({
+            id: randomUUID(),
+            periodId: period.id,
+            memberId: member.id,
+            totalDeliveredQty,
+            achievedTierQty: achievedTier?.minQty,
+            bonusVnd,
+            ledgerEntryId: entry.id,
+            createdAt: new Date(),
+          });
+        }
+      }
+
+      if (awards.length > 0) {
+        await this.db.kpiAwards.create(awards, { session });
+      }
+
+      await this.db.kpiPeriods.updateOne(
+        { id: periodId },
+        { $set: { status: "SETTLED", settledAt: new Date(), settledBy: actor.id } },
+        { session }
+      );
+
+      await this.audit(actor, "KPI_PERIOD_SETTLED", periodId, requestId, session);
+      return {
+        periodId,
+        status: "SETTLED",
+        awardsCount: awards.length,
+        totalBonusVnd: awards.reduce((s, a) => s + a.bonusVnd, 0),
+      };
+    });
+  }
+
+  async getMyKpiProgress(actor: Actor) {
+    const now = new Date();
+    const period = await this.db.kpiPeriods.findOne({
+      status: "OPEN",
+      startDate: { $lte: now },
+      endDate: { $gte: now },
+    }).sort({ startDate: -1 }).lean() || await this.db.kpiPeriods.findOne({ status: "OPEN" }).sort({ startDate: -1 }).lean();
+
+    if (!period) {
+      return { hasActivePeriod: false };
+    }
+
+    const policy = await this.db.kpiPolicies.findOne({ id: period.policyId }).lean();
+    if (!policy) {
+      return { hasActivePeriod: false };
+    }
+
+    const { totalDeliveredQty } = await this.computeDeliveredQty(actor.id, period.startDate, period.endDate);
+    const sortedTiers = [...policy.tiers].sort((a, b) => a.minQty - b.minQty);
+    const achievedTier = [...sortedTiers].reverse().find(t => totalDeliveredQty >= t.minQty) || null;
+    const nextTier = sortedTiers.find(t => t.minQty > totalDeliveredQty) || null;
+
+    const remainingQtyToNextTier = nextTier ? nextTier.minQty - totalDeliveredQty : 0;
+    const progressPercent = nextTier
+      ? Math.min(100, Math.round((totalDeliveredQty / nextTier.minQty) * 100))
+      : 100;
+
+    return {
+      hasActivePeriod: true,
+      period,
+      policy: {
+        id: policy.id,
+        name: policy.name,
+        periodType: policy.periodType,
+        tiers: sortedTiers,
+      },
+      currentQty: totalDeliveredQty,
+      achievedTier,
+      currentBonusVnd: achievedTier ? achievedTier.bonusVnd : 0,
+      nextTier,
+      remainingQtyToNextTier,
+      progressPercent,
+    };
+  }
 }
+
