@@ -11,6 +11,14 @@ import type { Batch, Ledger, Order, Product, PurchaseReceipt, PurchaseReceiptIte
 import type { InternalCheckoutDto, InternalQuoteDto, PublicQuoteDto } from "./dto";
 import type { AssignOrderDto, CreateProductDto, EditOrderDto, ReturnDto } from "./dto";
 
+const INVENTORY_TIMEZONE_OFFSET_MS = 7 * 60 * 60 * 1000;
+
+/** Start of the current calendar day in Vietnam, expressed as a UTC instant. */
+export function inventoryExpiryCutoff(now = new Date()) {
+  const vietnamTime = new Date(now.getTime() + INVENTORY_TIMEZONE_OFFSET_MS);
+  return new Date(Date.UTC(vietnamTime.getUTCFullYear(), vietnamTime.getUTCMonth(), vietnamTime.getUTCDate()) - INVENTORY_TIMEZONE_OFFSET_MS);
+}
+
 export function allocateReceiptShipping<T extends { sku: string; qty: number; purchasePriceVnd: number }>(
   items: T[],
   shippingFeeVnd: number,
@@ -147,8 +155,9 @@ export class CommerceService {
       const quote = await this.computeQuote(actor, { items: dto.items, ...("voucherCode" in dto ? { voucherCode: dto.voucherCode } : {}), customerPhone: dto.customer.phone }, session);
       if (dto.clientExpectedTotalVnd !== quote.orderTotalVnd || dto.pricingFingerprint !== quote.pricingFingerprint) throw new ConflictException({ code: "PRICE_STALE_CONFIRMATION_REQUIRED", quote: safeQuote(quote) });
       const items = quote.items;
+      const expiryCutoff = inventoryExpiryCutoff();
       for (const item of dto.items) {
-        const stock = await this.db.batches.aggregate<{ available: number }>([{ $match: { sku: item.sku, status: "AVAILABLE", expiresAt: { $gt: new Date() } } }, { $group: { _id: null, available: { $sum: { $subtract: ["$onHand", "$reserved"] } } } }]).session(session);
+        const stock = await this.db.batches.aggregate<{ available: number }>([{ $match: { sku: item.sku, status: "AVAILABLE", expiresAt: { $gt: expiryCutoff } } }, { $group: { _id: null, available: { $sum: { $subtract: ["$onHand", "$reserved"] } } } }]).session(session);
         if ((stock[0]?.available ?? 0) < item.qty) throw new ConflictException("OUT_OF_STOCK");
       }
       const id = randomUUID();
@@ -192,13 +201,14 @@ export class CommerceService {
   private async reserve(order: Order, actor: Actor, session: ClientSession, reason: string) {
     order.allocations = [];
     const now = new Date();
+    const expiryCutoff = inventoryExpiryCutoff(now);
     for (const item of order.items) {
-      const batches = await this.db.batches.find({ sku: item.sku, status: "AVAILABLE", expiresAt: { $gt: now }, $expr: { $gt: ["$onHand", "$reserved"] } }).sort({ expiresAt: 1, receivedAt: 1, id: 1 }).session(session).lean();
+      const batches = await this.db.batches.find({ sku: item.sku, status: "AVAILABLE", expiresAt: { $gt: expiryCutoff }, $expr: { $gt: ["$onHand", "$reserved"] } }).sort({ expiresAt: 1, receivedAt: 1, id: 1 }).session(session).lean();
       let remaining = item.qty;
       for (const batch of batches) {
         if (!remaining) break;
         const qty = Math.min(remaining, batch.onHand - batch.reserved);
-        await this.move(actor, batch, 0, qty, "RESERVE", session, reason, order.id, now);
+        await this.move(actor, batch, 0, qty, "RESERVE", session, reason, order.id, expiryCutoff);
         order.allocations.push({ batchId: batch.id, sku: item.sku, qty, landedUnitCostVnd: batch.landedUnitCostVnd, returnedQty: 0 }); remaining -= qty;
       }
       if (remaining) throw new ConflictException("OUT_OF_STOCK");
@@ -248,8 +258,9 @@ export class CommerceService {
         if (!item) throw new ConflictException("ALLOCATION_INVALID");
         if (line.disposition === "RESTOCK") {
           const batch = await this.db.batches.findOne({ id: line.batchId }).session(session).lean();
-          if (!batch || !batch.labelReference || !batch.expiresAt || batch.expiresAt <= new Date() || batch.status !== "AVAILABLE") throw new ConflictException("BATCH_UNSAFE");
-          await this.move(actor, batch, line.qty, 0, "RETURN_RESTOCK", session, dto.reason, id, new Date());
+          const expiryCutoff = inventoryExpiryCutoff();
+          if (!batch || !batch.labelReference || !batch.expiresAt || batch.expiresAt <= expiryCutoff || batch.status !== "AVAILABLE") throw new ConflictException("BATCH_UNSAFE");
+          await this.move(actor, batch, line.qty, 0, "RETURN_RESTOCK", session, dto.reason, id, expiryCutoff);
           recoveredCost += line.qty * allocation.landedUnitCostVnd;
         } else {
           await this.db.movements.create([{ id: randomUUID(), batchId: line.batchId, sku: allocation.sku, orderId: id, type: "RETURN_DISCARD", reason: dto.reason, qtyDelta: 0, reservedDelta: 0, actorId: actor.id, createdAt: new Date() }], { session });
@@ -284,6 +295,7 @@ export class CommerceService {
       const from = order.status;
       if (from === dto.status) return { id, status: order.status, version: order.version };
       const now = new Date();
+      const expiryCutoff = inventoryExpiryCutoff(now);
       const wasShipped = !!order.shippedAt;
       const ship = ["SHIPPING", "DELIVERED", "DELIVERY_FAILED"].includes(dto.status) && !wasShipped;
       const needsReservation = ["CONFIRMED", "PACKING", "SHIPPING", "DELIVERED", "DELIVERY_FAILED"].includes(dto.status);
@@ -298,8 +310,8 @@ export class CommerceService {
           const batch = await this.db.batches.findOne({ id: allocation.batchId }).session(session).lean();
           if (!batch) throw new ConflictException("BATCH_MISSING");
           const shipping = ship;
-          if (shipping && (batch.status !== "AVAILABLE" || !batch.expiresAt || batch.expiresAt <= now)) throw new ConflictException("BATCH_UNSAFE");
-          await this.move(actor, batch, shipping ? -allocation.qty : 0, -allocation.qty, shipping ? "STOCK_OUT" : "RELEASE", session, dto.reason, id, shipping ? now : undefined);
+          if (shipping && (batch.status !== "AVAILABLE" || !batch.expiresAt || batch.expiresAt <= expiryCutoff)) throw new ConflictException("BATCH_UNSAFE");
+          await this.move(actor, batch, shipping ? -allocation.qty : 0, -allocation.qty, shipping ? "STOCK_OUT" : "RELEASE", session, dto.reason, id, shipping ? expiryCutoff : undefined);
         }
         if (ship) order.shippedAt = now;
         if (release) { order.allocations = []; order.cogsVnd = 0; }
@@ -440,7 +452,6 @@ export class CommerceService {
     });
   }
   async listPurchaseReceipts(actor: Actor, page: number, limit: number) {
-    this.owner(actor);
     return this.db.purchaseReceipts.find({}, { _id: 0 }).sort({ receivedAt: -1, createdAt: -1 }).skip(page * limit).limit(limit).lean();
   }
   async receipt(actor: Actor, dto: ReceiptDto, key: string, requestId: string) {
