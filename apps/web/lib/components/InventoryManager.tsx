@@ -23,6 +23,7 @@ import { money, text } from "../i18n";
 import type { Lang, Batch, PurchaseReceipt } from "../types";
 
 export interface InventoryManagerProps {
+  readOnly?: boolean;
   batches: Batch[];
   lang: Lang;
   onRefresh: () => void;
@@ -39,6 +40,7 @@ interface NewReceiptItem {
 }
 
 export function InventoryManager({
+  readOnly = false,
   batches,
   lang,
   onRefresh,
@@ -84,18 +86,24 @@ export function InventoryManager({
   const kpis = useMemo(() => {
     let totalOnHand = 0;
     let totalReserved = 0;
+    let totalAvailable = 0;
     let totalCostValue = 0;
     const sizeCounts: Record<string, number> = { "CBST-300": 0, "CBST-400": 0, "CBST-600": 0 };
     let expiringSoonCount = 0;
     const now = new Date();
+    const vietnamNow = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+    const expiryCutoff = Date.UTC(vietnamNow.getUTCFullYear(), vietnamNow.getUTCMonth(), vietnamNow.getUTCDate()) - 7 * 60 * 60 * 1000;
     const thirtyDaysAhead = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
     for (const b of batches) {
       totalOnHand += b.onHand;
       totalReserved += b.reserved;
       totalCostValue += b.onHand * b.landedUnitCostVnd;
+      const available = b.status === "AVAILABLE" && b.expiresAt && Date.parse(b.expiresAt) > expiryCutoff
+        ? Math.max(0, b.onHand - b.reserved) : 0;
+      totalAvailable += available;
       if (sizeCounts[b.sku] !== undefined) {
-        sizeCounts[b.sku] += b.onHand;
+        sizeCounts[b.sku] += available;
       }
       if (b.expiresAt) {
         const exp = new Date(b.expiresAt);
@@ -107,7 +115,7 @@ export function InventoryManager({
 
     return {
       totalOnHand,
-      available: Math.max(0, totalOnHand - totalReserved),
+      available: totalAvailable,
       totalReserved,
       totalCostValue,
       sizeCounts,
@@ -346,7 +354,7 @@ export function InventoryManager({
           variant="brand"
         />
         <KpiCard
-          title={text(lang, "Tồn kho theo size", "Stock by size")}
+          title={text(lang, "Tồn khả dụng theo size", "Available stock by size")}
           value={`${kpis.sizeCounts["CBST-300"]} / ${kpis.sizeCounts["CBST-400"]} / ${kpis.sizeCounts["CBST-600"]}`}
           subtext={text(lang, "300g / 400g / 600g", "300g / 400g / 600g")}
           icon={Package}
@@ -522,6 +530,7 @@ export function InventoryManager({
               margin: 0,
             }}
             onClick={() => setIsReceiptModalOpen(true)}
+            disabled={readOnly}
           >
             <Plus size={16} />
             <span>{text(lang, "Nhập kho (Đa SKU)", "Multi-SKU Receipt")}</span>
@@ -546,6 +555,7 @@ export function InventoryManager({
               setAdjustError(null);
               setIsAdjustmentModalOpen(true);
             }}
+            disabled={readOnly}
           >
             <SlidersHorizontal size={16} />
             <span>{text(lang, "Điều chỉnh kho", "Adjust stock")}</span>
@@ -659,7 +669,7 @@ export function InventoryManager({
                       )}
                     </td>
                     <td style={{ textAlign: "center" }}>
-                      {available > 0 && (
+                      {!readOnly && available > 0 && (
                         <button
                           type="button"
                           className="button secondary"

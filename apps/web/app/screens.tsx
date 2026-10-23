@@ -6186,6 +6186,7 @@ function AdminInner({
               <ErrorNotice error={error} lang={lang} />
               {section === "inventory" ? (
                 <InventoryManager
+                  readOnly={!owner}
                   batches={rows as unknown as Batch[]}
                   lang={lang}
                   onRefresh={() => refresh("inventory_receipt")}

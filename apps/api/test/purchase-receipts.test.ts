@@ -1,8 +1,20 @@
 import { describe, it, expect, vi } from "vitest";
-import { allocateReceiptShipping, CommerceService } from "../src/v2/service";
+import { allocateReceiptShipping, CommerceService, inventoryExpiryCutoff } from "../src/v2/service";
 import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
 import { PurchaseReceiptItemDto } from "../src/v2/dto";
+
+describe("inventory expiry cutoff", () => {
+  it("keeps a batch sellable through its expiry date in Vietnam", () => {
+    expect(inventoryExpiryCutoff(new Date("2026-10-23T10:00:00.000Z"))).toEqual(new Date("2026-10-22T17:00:00.000Z"));
+    expect(new Date("2026-10-23T00:00:00.000Z").getTime()).toBeGreaterThan(inventoryExpiryCutoff(new Date("2026-10-23T10:00:00.000Z")).getTime());
+  });
+
+  it("expires the batch when the next Vietnam calendar day begins", () => {
+    expect(inventoryExpiryCutoff(new Date("2026-10-23T17:00:00.000Z"))).toEqual(new Date("2026-10-23T17:00:00.000Z"));
+    expect(new Date("2026-10-23T00:00:00.000Z").getTime()).toBeLessThanOrEqual(inventoryExpiryCutoff(new Date("2026-10-23T17:00:00.000Z")).getTime());
+  });
+});
 
 describe("Inventory Purchase Receipts - Shipping Fee Allocation", () => {
   it("allocates shipping fee proportionally by line total with deterministic integer remainder", () => {
