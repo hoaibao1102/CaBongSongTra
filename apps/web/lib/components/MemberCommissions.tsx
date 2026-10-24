@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import type { Actor, Lang, KpiProgress } from "../types";
 import type { CommissionLedgerEntry } from "./CommissionManager";
 import { money, text } from "../i18n";
-import { Award, Target, TrendingUp, CheckCircle, Gift } from "lucide-react";
+import { Target, CheckCircle, Gift } from "lucide-react";
 
 export function MemberCommissions({ actor, ledger, lang }: { actor: Actor; ledger: CommissionLedgerEntry[]; lang: Lang }) {
   // /commissions/me is scoped by the authenticated session, not a supplied user ID.

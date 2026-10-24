@@ -10,7 +10,6 @@ import {
   Search,
   Trash2,
   Truck,
-  Package,
 } from "lucide-react";
 import { Modal } from "./Modal";
 import { CurrencyInput } from "./CurrencyInput";

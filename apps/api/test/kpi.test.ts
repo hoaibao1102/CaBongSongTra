@@ -126,7 +126,7 @@ describe("KPI Service & Milestone Rewards", () => {
 
     // Member 1 delivered 25 (reaches tier 20 -> 50k bonus)
     // Member 2 delivered 10 (reaches 0 tier -> 0 bonus)
-    (db.orders.find as any).mockImplementation((filter: { responsibleMemberId: string }) => {
+    (db.orders.find as unknown as { mockImplementation: (fn: (filter: { responsibleMemberId: string }) => unknown) => unknown }).mockImplementation((filter: { responsibleMemberId: string }) => {
       if (filter?.responsibleMemberId === "member1") {
         return query([{ items: [{ sku: "A", qty: 25 }], allocations: [] }]);
       }

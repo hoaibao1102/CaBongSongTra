@@ -8,15 +8,11 @@ import {
   Wallet,
   CheckCircle2,
   Search,
-  CreditCard,
-  History,
   Target,
-  Award,
   Plus,
   Trash2,
   Eye,
   Calendar,
-  Sparkles,
   CheckCircle,
 } from "lucide-react";
 import { Modal } from "./Modal";
@@ -82,7 +78,7 @@ export function CommissionManager({
   // KPI Data
   const [kpiPolicies, setKpiPolicies] = useState<KpiPolicy[]>([]);
   const [kpiPeriods, setKpiPeriods] = useState<KpiPeriod[]>([]);
-  const [kpiLoading, setKpiLoading] = useState(false);
+  const [, setKpiLoading] = useState(false);
 
   // KPI Policy Modal
   const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);

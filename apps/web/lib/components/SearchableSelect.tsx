@@ -26,7 +26,6 @@ export function SearchableSelect({
   onChange,
   placeholder = "Chọn một mục...",
   disabled = false,
-  required = false,
   id,
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false);

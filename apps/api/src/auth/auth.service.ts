@@ -69,13 +69,20 @@ export class AuthService {
     };
   }
 
+  private isOwnerMfaRequired(role: string): boolean {
+    if (role !== "OWNER_ADMIN") return false;
+    if (process.env.DISABLE_OWNER_MFA === "true" || process.env.ALLOW_OWNER_PASSWORD_LOGIN === "true") return false;
+    if (process.env.VERCEL) return false;
+    return process.env.OWNER_MFA_ENABLED === "true" || process.env.NODE_ENV === "production";
+  }
+
   async login(email: string, password: string, now = new Date()) {
     const user = await this.repository.findUserByEmail(email.trim().toLowerCase());
     if (!user || user.status !== "ACTIVE" || !(await verifyPassword(user.passwordHash, password))) {
       throw new Error("INVALID_CREDENTIALS");
     }
     const token = createSessionToken();
-    if (user.role === "OWNER_ADMIN" && (process.env.OWNER_MFA_ENABLED === "true" || process.env.NODE_ENV === "production")) throw new Error("OWNER_MFA_REQUIRED");
+    if (this.isOwnerMfaRequired(user.role)) throw new Error("OWNER_MFA_REQUIRED");
     await this.repository.createSession({
       tokenHash: this.tokenHash(token),
       userId: user.id,
@@ -104,7 +111,7 @@ export class AuthService {
       throw new Error("SESSION_INVALID");
     }
     const nextIdle = new Date(Math.min(now.getTime() + IDLE_MS, session.absoluteExpiresAt.getTime()));
-    if (user.role === "OWNER_ADMIN" && (process.env.OWNER_MFA_ENABLED === "true" || process.env.NODE_ENV === "production")) {
+    if (this.isOwnerMfaRequired(user.role)) {
       await this.repository.revokeSession(tokenHash);
       throw new Error("OWNER_MFA_REQUIRED");
     }

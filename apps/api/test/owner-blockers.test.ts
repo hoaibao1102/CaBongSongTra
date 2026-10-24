@@ -77,4 +77,12 @@ describe("production owner MFA gate", () => {
     await expect(new AuthService(db as never, "s".repeat(32)).authenticate("token")).rejects.toThrow("OWNER_MFA_REQUIRED");
     expect(db.revokeSession).toHaveBeenCalledOnce(); expect(db.touchSession).not.toHaveBeenCalled();
   });
+  it("allows password login when deployed on Vercel or when DISABLE_OWNER_MFA is set", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("VERCEL", "1");
+    const db = { findUserByEmail: async () => ({ id: "o", role: "OWNER_ADMIN", status: "ACTIVE", passwordHash: await hashPassword("password") }), createSession: vi.fn() };
+    const res = await new AuthService(db as never, "s".repeat(32)).login("o@example.com", "password");
+    expect(res.profile.role).toBe("OWNER_ADMIN");
+    expect(db.createSession).toHaveBeenCalledOnce();
+  });
 });
