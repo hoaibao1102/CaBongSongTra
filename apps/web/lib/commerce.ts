@@ -82,7 +82,7 @@ export const sectionsFor = (role: Role) =>
         "commissions",
         "audit",
       ]
-    : ["dashboard", "create-order", "orders", "vouchers", "commissions"];
+    : ["dashboard", "create-order", "orders", "inventory", "vouchers", "commissions"];
 type Action = {
   vi: string;
   en: string;

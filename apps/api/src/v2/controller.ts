@@ -86,11 +86,16 @@ export class CommerceController {
   @Owner() @Post("inventory/receipts") receipt(@Req() req: ApiRequest, @Body() dto: ReceiptDto) { return this.service.receipt(req.actor, dto, requestKey(req), req.requestId); }
   @Owner() @Post("inventory/purchase-receipts") @ApiBody({ type: CreatePurchaseReceiptDto }) @ApiHeader({ name: "Idempotency-Key", required: true })
   purchaseReceipt(@Req() req: ApiRequest, @Body() dto: CreatePurchaseReceiptDto) { return this.service.createPurchaseReceipt(req.actor, dto, requestKey(req), req.requestId); }
-  @Owner() @Get("inventory/purchase-receipts") purchaseReceipts(@Req() req: ApiRequest, @Query() query: PageDto) { const { page, limit } = pagination(query); return this.service.listPurchaseReceipts(req.actor, page, limit); }
+  @Get("inventory/purchase-receipts") purchaseReceipts(@Req() req: ApiRequest, @Query() query: PageDto) { const { page, limit } = pagination(query); return this.service.listPurchaseReceipts(req.actor, page, limit); }
   @Owner() @Post("inventory/adjustments") adjustment(@Req() req: ApiRequest, @Body() dto: AdjustmentDto) { return this.service.adjustment(req.actor, dto, requestKey(req), req.requestId); }
   @Owner() @Patch("inventory/batches/:id/status") batchStatus(@Req() req: ApiRequest, @Param("id", new ParseUUIDPipe()) id: string, @Body() dto: BatchStatusDto) { return this.service.updateBatchStatus(req.actor, id, dto.status, requestKey(req), req.requestId); }
   @Get("inventory/availability") availability() { return this.service.getInventoryAvailability(); }
-  @Owner() @Get("inventory/batches") batches(@Query() query: PageDto) { const { page, limit } = pagination(query); return this.db.batches.find({}, { _id: 0, id: 1, sku: 1, lotCode: 1, receivedAt: 1, expiresAt: 1, onHand: 1, reserved: 1, landedUnitCostVnd: 1, status: 1, receiptCode: 1, supplierLotCode: 1, purchasePriceVnd: 1, allocatedShippingVnd: 1 }).sort({ receivedAt: -1, id: 1 }).skip(page * limit).limit(limit).lean(); }
+  @Get("inventory/batches") batches(@Req() req: ApiRequest, @Query() query: PageDto) {
+    const { page, limit } = pagination(query);
+    const projection: Record<string, 0 | 1> = { _id: 0, id: 1, sku: 1, lotCode: 1, receivedAt: 1, expiresAt: 1, onHand: 1, reserved: 1, status: 1 };
+    Object.assign(projection, { landedUnitCostVnd: 1, receiptCode: 1, supplierLotCode: 1, purchasePriceVnd: 1, allocatedShippingVnd: 1 });
+    return this.db.batches.find({}, projection).sort({ receivedAt: -1, id: 1 }).skip(page * limit).limit(limit).lean();
+  }
   @Owner() @Get("inventory/movements") movements(@Query() query: PageDto) { const { page, limit } = pagination(query); return this.db.movements.find({}, { _id: 0, id: 1, batchId: 1, sku: 1, orderId: 1, type: 1, qtyDelta: 1, reservedDelta: 1, actorId: 1, createdAt: 1 }).sort({ createdAt: -1, id: 1 }).skip(page * limit).limit(limit).lean(); }
   @Owner() @Get("users") users(@Query() query: PageDto) { const { page, limit } = pagination(query); return this.db.users.find({}, { _id: 0, id: 1, displayName: 1, emailNormalized: 1, role: 1, status: 1, commissionRateBps: 1, bankInfo: 1 }).sort({ id: 1 }).skip(page * limit).limit(limit).lean(); }
   @Owner() @Post("users") createUser(@Req() req: ApiRequest, @Body() dto: CreateUserDto) { return this.service.createUser(req.actor, dto, requestKey(req), req.requestId); }

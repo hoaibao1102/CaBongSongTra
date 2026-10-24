@@ -121,7 +121,7 @@ describe("bilingual usable screens", () => {
     );
     expect(html).toContain("Orders");
     expect(html).toContain("Commissions");
-    expect(html).not.toContain("Inventory");
+    expect(html).not.toContain("Expenses");
     expect(html).not.toContain("Audit log");
   });
   it("renders all owner navigation", () => {

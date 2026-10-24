@@ -80,6 +80,7 @@ describe("local API contract and forms", () => {
       "dashboard",
       "create-order",
       "orders",
+      "inventory",
       "vouchers",
       "commissions",
     ]);
