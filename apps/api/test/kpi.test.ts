@@ -116,7 +116,8 @@ describe("KPI Service & Milestone Rewards", () => {
 
   it("settles KPI period: writes KPI_BONUS to ledger, updates member balance and creates awards", async () => {
     const { db, service } = setup();
-    db.kpiPeriods.findOne.mockReturnValue(query(period));
+    db.kpiPeriods.findOne.mockReturnValue(query({ ...period, endDate: new Date("2020-02-01") }));
+    db.kpiPeriods.updateOne.mockResolvedValue({ modifiedCount: 1, matchedCount: 1 } as never);
     db.kpiPolicies.findOne.mockReturnValue(query(policy));
     db.users.find.mockReturnValue(query([
       { id: "member1", displayName: "Member 1", emailNormalized: "m1@example.com", role: "MEMBER" },
@@ -135,7 +136,7 @@ describe("KPI Service & Milestone Rewards", () => {
     const result = await service.settleKpiPeriod(owner, "period-1", {}, "key", "req");
 
     expect(result.status).toBe("SETTLED");
-    expect(result.awardsCount).toBe(1);
+    expect(result.awardsCount).toBe(2); // zero-result members are settlement facts too
     expect(result.totalBonusVnd).toBe(50000);
 
     // Verify Ledger entry for member1 with kind: KPI_BONUS
@@ -159,11 +160,11 @@ describe("KPI Service & Milestone Rewards", () => {
 
     // Verify Period status updated
     expect(db.kpiPeriods.updateOne).toHaveBeenCalledWith(
-      { id: "period-1" },
+      { id: "period-1", status: "OPEN", settlementSnapshot: { $exists: false } },
       expect.objectContaining({
-        $set: expect.objectContaining({ status: "SETTLED" }),
+        $set: expect.objectContaining({ status: "SETTLED", settlementSnapshot: expect.objectContaining({ version: 1, totalBonusVnd: 50000, members: expect.arrayContaining([expect.objectContaining({ memberId: "member2", bonusVnd: 0 })]) }) }),
       }),
-      { session },
+      { session, runValidators: true, overwriteImmutable: true },
     );
   });
 

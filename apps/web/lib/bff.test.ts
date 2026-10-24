@@ -507,4 +507,15 @@ describe("same-origin BFF", () => {
     );
     expect(result.status).toBe(504);
   }, 1000);
+  it("proxies inventory/availability GET requests", async () => {
+    const fetcher = vi.fn().mockResolvedValue(Response.json({ "CBST-300": { available: 5 } }));
+    const response = await proxy(
+      request("inventory/availability"),
+      ["v1", "inventory", "availability"],
+      config,
+      fetcher,
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ "CBST-300": { available: 5 } });
+  });
 });

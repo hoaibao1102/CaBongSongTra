@@ -323,7 +323,7 @@ describe("browser requests and safe retries", () => {
       .fn()
       .mockRejectedValueOnce(new Error("offline"))
       .mockResolvedValue(new Response('{"id":"1"}'));
-    const mutate = createMutation(fetcher);
+    const mutate = createMutation(fetcher, mutationOptions());
     await expect(mutate("orders", { a: 1 })).rejects.toThrow();
     await mutate("orders", { a: 1 });
     const key = (index: number) =>
@@ -337,7 +337,7 @@ describe("browser requests and safe retries", () => {
     const fetcher = vi
       .fn()
       .mockImplementation(() => Promise.resolve(new Response("{}")));
-    await createMutation(fetcher)(
+    await createMutation(fetcher, mutationOptions())(
       "checkout/orders",
       {},
       "POST",
@@ -377,16 +377,18 @@ describe("browser requests and safe retries", () => {
     ).rejects.toThrow();
     expect(fetcher).not.toHaveBeenCalled();
   });
-  it("retains keys for multiple failed payloads without storing customer data in storage", async () => {
+  it("blocks edits while retaining the original failed payload key", async () => {
     const fetcher = vi.fn().mockRejectedValue(new Error("offline"));
-    const mutate = createMutation(fetcher);
+    const mutate = createMutation(fetcher, mutationOptions());
     await mutate("orders", { qty: 1 }).catch(() => {});
-    await mutate("orders", { qty: 2 }).catch(() => {});
+    await expect(mutate("orders", { qty: 2 })).rejects.toThrow("OPERATION_RECONCILIATION_REQUIRED");
     await mutate("orders", { qty: 1 }).catch(() => {});
     expect(
       new Headers(fetcher.mock.calls[0][1].headers).get("Idempotency-Key"),
     ).toBe(
-      new Headers(fetcher.mock.calls[2][1].headers).get("Idempotency-Key"),
+      new Headers(fetcher.mock.calls[1][1].headers).get("Idempotency-Key"),
     );
   });
 });
+
+function mutationOptions() { const values = new Map<string,string>(); return { actorId:"test-owner", store:{getItem:(k:string)=>values.get(k)??null,setItem:(k:string,v:string)=>{values.set(k,v);},removeItem:(k:string)=>{values.delete(k);}} }; }

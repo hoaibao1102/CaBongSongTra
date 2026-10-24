@@ -1,13 +1,14 @@
 "use client";
+import { useActorMutation } from "../operation-actor";
 
 import React, { useState, useMemo } from "react";
 import { Edit3, CheckCircle2, XCircle, Tag, Plus, Search } from "lucide-react";
 import { Modal } from "./Modal";
 import { CurrencyInput } from "./CurrencyInput";
-import { ApiError, createMutation } from "../commerce";
-import { money, text } from "../i18n";
+import { ApiError } from "../commerce";
+import { money, text, errorText } from "../i18n";
 import type { Lang } from "../types";
-const durableMutation = createMutation();
+
 
 export interface OwnerProductRow {
   id: string;
@@ -32,6 +33,7 @@ export function ProductManager({
   onRefresh,
   onUnauthorized,
 }: ProductManagerProps) {
+  const durableMutation = useActorMutation();
   // Edit Product Modal State
   const [editingProduct, setEditingProduct] = useState<OwnerProductRow | null>(null);
   const [editName, setEditName] = useState("");
@@ -93,7 +95,7 @@ export function ProductManager({
             : err.message || "Không thể cập nhật sản phẩm.",
         );
       } else {
-        setError("Đã xảy ra lỗi không xác định.");
+        setError(errorText(err, lang));
       }
     } finally {
       setSubmitting(false);
@@ -143,7 +145,7 @@ export function ProductManager({
             : err.message || text(lang, "Không thể tạo sản phẩm mới.", "Failed to create product.")
         );
       } else {
-        setCreateError(text(lang, "Đã xảy ra lỗi không xác định.", "An unknown error occurred."));
+        setCreateError(text(lang, errorText(err, lang), "An unknown error occurred."));
       }
     } finally {
       setCreateSubmitting(false);

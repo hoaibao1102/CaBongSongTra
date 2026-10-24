@@ -5,8 +5,8 @@ import type { LucideIcon } from "lucide-react";
 
 export interface KpiCardProps {
   title: string;
-  value: string | number;
-  subtext?: string;
+  value: React.ReactNode;
+  subtext?: React.ReactNode;
   icon?: LucideIcon;
   variant?: "brand" | "emerald" | "amber" | "purple" | "blue" | "red" | "neutral";
 }

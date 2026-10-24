@@ -5390,6 +5390,74 @@ footer p {
 }
 
 /* ==========================================================================
+   SCOPE CARD SELECTION COMPONENT (Expense & Commission Modals)
+   ========================================================================== */
+
+button.cbst-scope-card {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 12px !important;
+  padding: 14px 16px !important;
+  border-radius: 12px !important;
+  border: 1.5px solid #e7e5e4 !important;
+  background: #ffffff !important;
+  color: #1c1917 !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  transition: all 0.18s ease !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+  width: 100% !important;
+  min-height: 72px !important;
+}
+
+button.cbst-scope-card:hover {
+  border-color: #d84012 !important;
+  background: #fafaf9 !important;
+  transform: translateY(-1px);
+}
+
+button.cbst-scope-card.selected {
+  border-color: #d84012 !important;
+  background: #fff7ed !important;
+  box-shadow: 0 0 0 2px rgba(216, 64, 18, 0.2) !important;
+}
+
+button.cbst-scope-card svg {
+  color: #78716c !important;
+  flex-shrink: 0 !important;
+  margin-top: 2px !important;
+  transition: color 0.15s ease !important;
+}
+
+button.cbst-scope-card.selected svg {
+  color: #d84012 !important;
+}
+
+button.cbst-scope-card strong {
+  display: block !important;
+  font-size: 0.94rem !important;
+  font-weight: 700 !important;
+  color: #1c1917 !important;
+  margin-bottom: 2px !important;
+}
+
+button.cbst-scope-card.selected strong {
+  color: #c2410c !important;
+}
+
+button.cbst-scope-card small {
+  display: block !important;
+  font-size: 0.78rem !important;
+  color: #78716c !important;
+  line-height: 1.3 !important;
+  font-weight: 400 !important;
+}
+
+button.cbst-scope-card.selected small {
+  color: #9a3412 !important;
+}
+
+/* ==========================================================================
    CURRENCY INPUT COMPONENT
    ========================================================================== */
 
@@ -5942,3 +6010,303 @@ select.cbst-select-filter:hover {
 .order-detail-metric-box.highlight dd {
   color: #c2410c;
 }
+
+/* ==========================================================================
+   ORDERS FILTER TOOLBAR
+   ========================================================================== */
+
+.orders-filter-bar {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+  flex-wrap: wrap !important;
+  background: #ffffff !important;
+  padding: 10px 14px !important;
+  border-radius: 12px !important;
+  border: 1px solid #e7e5e4 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
+}
+
+.orders-filter-group {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-wrap: wrap !important;
+  flex: 1 1 auto !important;
+}
+
+.orders-search-wrap {
+  position: relative !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  width: 250px !important;
+  max-width: 100% !important;
+  flex: 1 1 200px !important;
+}
+
+.orders-search-wrap input {
+  width: 100% !important;
+  height: 38px !important;
+  padding: 0 30px 0 36px !important;
+  border-radius: 8px !important;
+  border: 1px solid #d6d3d1 !important;
+  font-size: 0.86rem !important;
+  background: #faf8f5 !important;
+  color: #1f2937 !important;
+  margin: 0 !important;
+  transition: all 0.2s ease !important;
+}
+
+.orders-search-wrap input:focus {
+  border-color: #d84012 !important;
+  background: #ffffff !important;
+  box-shadow: 0 0 0 3px rgba(216, 64, 18, 0.1) !important;
+  outline: none !important;
+}
+
+select.cbst-order-filter-select {
+  display: inline-block !important;
+  width: auto !important;
+  min-width: 130px !important;
+  max-width: 220px !important;
+  height: 38px !important;
+  padding: 0 28px 0 10px !important;
+  border-radius: 8px !important;
+  border: 1px solid #d6d3d1 !important;
+  font-size: 0.84rem !important;
+  font-weight: 500 !important;
+  background-color: #faf8f5 !important;
+  color: #374151 !important;
+  cursor: pointer !important;
+  margin: 0 !important;
+  flex: 0 0 auto !important;
+  transition: all 0.15s ease !important;
+}
+
+select.cbst-order-filter-select:hover {
+  border-color: #a8a29e !important;
+  background-color: #f5f5f4 !important;
+}
+
+select.cbst-order-filter-select:focus {
+  border-color: #d84012 !important;
+  outline: none !important;
+}
+
+select.cbst-order-filter-select.active {
+  background-color: #fff7ed !important;
+  border-color: #d84012 !important;
+  color: #9a3412 !important;
+  font-weight: 600 !important;
+}
+
+select.cbst-order-filter-select.active-blue {
+  background-color: #eff6ff !important;
+  border-color: #2563eb !important;
+  color: #1e40af !important;
+  font-weight: 600 !important;
+}
+
+select.cbst-order-filter-select.active-amber {
+  background-color: #fef3c7 !important;
+  border-color: #d97706 !important;
+  color: #92400e !important;
+  font-weight: 600 !important;
+}
+
+/* ==========================================================================
+   MEMBER STOCK & SALES GUIDANCE STYLES
+   ========================================================================== */
+
+.cbst-stock-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  line-height: 1.2;
+}
+
+.cbst-stock-badge.in-stock {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.cbst-stock-badge.low-stock {
+  background: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fde68a;
+  animation: pulse-slow 2s infinite;
+}
+
+.cbst-stock-badge.out-of-stock {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+@keyframes pulse-slow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.75; }
+}
+
+.cbst-stock-guide-banner {
+  background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+  border: 1px solid #fed7aa;
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.cbst-guide-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.84rem;
+  color: #7c2d12;
+  font-weight: 500;
+}
+
+.cbst-guide-pill strong {
+  color: #9a3412;
+  font-weight: 700;
+}
+
+.cbst-member-inventory-widget {
+  background: #ffffff;
+  border: 1px solid #e7e5e4;
+  border-radius: 14px;
+  padding: 20px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+.cbst-sku-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px;
+  margin-top: 14px;
+}
+
+.cbst-sku-card {
+  background: #fafaf9;
+  border: 1px solid #e7e5e4;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+  transition: all 0.2s ease;
+}
+
+.cbst-sku-card:hover {
+  transform: translateY(-2px);
+  border-color: #fdba74;
+  box-shadow: 0 4px 12px rgba(216, 64, 18, 0.08);
+  background: #ffffff;
+}
+
+.cbst-sku-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.cbst-sku-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1c1917;
+  margin: 0 0 4px;
+}
+
+.cbst-sku-meta {
+  font-size: 0.78rem;
+  color: #78716c;
+}
+
+.cbst-commission-card {
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+  border: 1.5px solid #10b981;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin: 12px 0;
+}
+
+.cbst-commission-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.cbst-commission-card-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #065f46;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.cbst-commission-card-val {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #047857;
+}
+
+.cbst-commission-card-sub {
+  font-size: 0.75rem;
+  color: #059669;
+  line-height: 1.3;
+}
+
+.cbst-sku-order-btn {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  width: 100% !important;
+  height: 40px !important;
+  padding: 0 16px !important;
+  font-size: 0.88rem !important;
+  font-weight: 700 !important;
+  border-radius: 8px !important;
+  background: #d84012 !important;
+  color: #ffffff !important;
+  border: 1px solid #d84012 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  box-shadow: 0 2px 6px rgba(216, 64, 18, 0.25) !important;
+  text-decoration: none !important;
+}
+
+.cbst-sku-order-btn:hover:not(:disabled) {
+  background: #b8320a !important;
+  border-color: #b8320a !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 10px rgba(216, 64, 18, 0.35) !important;
+}
+
+.cbst-sku-order-btn:disabled,
+.cbst-sku-order-btn.disabled {
+  background: #f5f5f4 !important;
+  color: #a8a29e !important;
+  border-color: #e7e5e4 !important;
+  cursor: not-allowed !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+

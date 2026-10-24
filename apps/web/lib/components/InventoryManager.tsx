@@ -1,4 +1,5 @@
 "use client";
+import { useActorMutation } from "../operation-actor";
 
 import React, { useState, useMemo } from "react";
 import {
@@ -15,11 +16,12 @@ import {
 } from "lucide-react";
 import { Modal } from "./Modal";
 import { CurrencyInput } from "./CurrencyInput";
+import { previewReceiptCost } from "../receipt-costing";
 import { SearchableSelect } from "./SearchableSelect";
 import { KpiCard } from "./KpiCard";
-import { apiRequest, ApiError, createMutation } from "../commerce";
-const durableMutation = createMutation();
-import { money, text } from "../i18n";
+import { apiRequest, ApiError } from "../commerce";
+
+import { money, text, errorText } from "../i18n";
 import type { Lang, Batch, PurchaseReceipt } from "../types";
 
 export interface InventoryManagerProps {
@@ -44,6 +46,7 @@ export function InventoryManager({
   onRefresh,
   onUnauthorized,
 }: InventoryManagerProps) {
+  const durableMutation = useActorMutation();
   // Filters
   const [skuFilter, setSkuFilter] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
@@ -86,6 +89,7 @@ export function InventoryManager({
     let totalReserved = 0;
     let totalCostValue = 0;
     const sizeCounts: Record<string, number> = { "CBST-300": 0, "CBST-400": 0, "CBST-600": 0 };
+    const availableSizeCounts: Record<string, number> = { "CBST-300": 0, "CBST-400": 0, "CBST-600": 0 };
     let expiringSoonCount = 0;
     const now = new Date();
     const thirtyDaysAhead = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
@@ -96,6 +100,12 @@ export function InventoryManager({
       totalCostValue += b.onHand * b.landedUnitCostVnd;
       if (sizeCounts[b.sku] !== undefined) {
         sizeCounts[b.sku] += b.onHand;
+      }
+      if (b.status === "AVAILABLE" && (!b.expiresAt || new Date(b.expiresAt) > now)) {
+        const avail = Math.max(0, b.onHand - b.reserved);
+        if (availableSizeCounts[b.sku] !== undefined) {
+          availableSizeCounts[b.sku] += avail;
+        }
       }
       if (b.expiresAt) {
         const exp = new Date(b.expiresAt);
@@ -111,6 +121,7 @@ export function InventoryManager({
       totalReserved,
       totalCostValue,
       sizeCounts,
+      availableSizeCounts,
       expiringSoonCount,
     };
   }, [batches]);
@@ -131,57 +142,13 @@ export function InventoryManager({
     });
   }, [batches, skuFilter, statusFilter, searchQuery]);
 
-  // Preview allocation of shipping fee in multi-SKU modal
-  const allocationPreview = useMemo(() => {
-    const validLines = receiptItems.filter((item) => item.qty > 0);
-    const lineTotals = validLines.map((item) => item.qty * item.purchasePriceVnd);
-    const subtotal = lineTotals.reduce((sum, val) => sum + val, 0);
-
-    if (subtotal === 0 || shippingFeeVnd === 0) {
-      return validLines.map((item, idx) => ({
-        ...item,
-        lineTotal: lineTotals[idx],
-        allocatedShipping: 0,
-        landedUnitCost: item.purchasePriceVnd,
-      }));
-    }
-
-    let allocatedSum = 0;
-    const shares = lineTotals.map((lineTotal) => {
-      const share = Math.floor((shippingFeeVnd * lineTotal) / subtotal);
-      allocatedSum += share;
-      return share;
-    });
-
-    const remainder = shippingFeeVnd - allocatedSum;
-    let maxIdx = 0;
-    let maxVal = lineTotals[0];
-    for (let i = 1; i < lineTotals.length; i++) {
-      if (lineTotals[i] > maxVal) {
-        maxVal = lineTotals[i];
-        maxIdx = i;
-      }
-    }
-    shares[maxIdx] += remainder;
-
-    return validLines.map((item, idx) => {
-      const allocatedShipping = shares[idx];
-      const unitShipping = Math.floor(allocatedShipping / item.qty);
-      return {
-        ...item,
-        lineTotal: lineTotals[idx],
-        allocatedShipping,
-        landedUnitCost: item.purchasePriceVnd + unitShipping,
-      };
-    });
-  }, [receiptItems, shippingFeeVnd]);
-
-  const receiptSubtotal = useMemo(() => {
-    return receiptItems.reduce(
-      (sum, item) => sum + Math.max(0, item.qty) * item.purchasePriceVnd,
-      0,
-    );
-  }, [receiptItems]);
+  // Pure preview mirrors BUS03 batches without touching mutation/actor state.
+  const receiptCostPreview = useMemo(
+    () => previewReceiptCost(receiptItems, shippingFeeVnd),
+    [receiptItems, shippingFeeVnd],
+  );
+  const allocationPreview = receiptCostPreview.lines;
+  const receiptSubtotal = receiptCostPreview.subtotalVnd;
 
   const handleUpdateItem = (
     id: string,
@@ -216,6 +183,10 @@ export function InventoryManager({
   const handleSubmitReceipt = async (e: React.FormEvent) => {
     e.preventDefault();
     setReceiptError(null);
+    if (receiptCostPreview.policyError) {
+      setReceiptError(receiptCostPreview.policyError);
+      return;
+    }
 
     const validLines = receiptItems.filter((item) => item.qty > 0);
     if (validLines.length === 0) {
@@ -255,7 +226,7 @@ export function InventoryManager({
       } else if (err instanceof ApiError) {
         setReceiptError(err.message || "Không thể tạo phiếu nhập.");
       } else {
-        setReceiptError("Đã xảy ra lỗi không xác định.");
+        setReceiptError(errorText(err, lang));
       }
     } finally {
       setReceiptSubmitting(false);
@@ -303,7 +274,7 @@ export function InventoryManager({
       } else if (err instanceof ApiError) {
         setAdjustError(err.message || "Không thể điều chỉnh kho.");
       } else {
-        setAdjustError("Đã xảy ra lỗi không xác định.");
+        setAdjustError(errorText(err, lang));
       }
     } finally {
       setAdjustSubmitting(false);
@@ -322,6 +293,25 @@ export function InventoryManager({
       setReceiptsList([]);
     } finally {
       setLoadingReceipts(false);
+    }
+  };
+
+  const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
+
+  const handleToggleStatus = async (batchId: string, currentStatus: "AVAILABLE" | "QUARANTINED") => {
+    const nextStatus = currentStatus === "AVAILABLE" ? "QUARANTINED" : "AVAILABLE";
+    setStatusUpdatingId(batchId);
+    try {
+      await durableMutation(`inventory/batches/${batchId}/status`, { status: nextStatus }, "PATCH");
+      onRefresh();
+    } catch (err: unknown) {
+      if (err instanceof ApiError && err.status === 401 && onUnauthorized) {
+        onUnauthorized();
+      } else {
+        alert(errorText(err, lang));
+      }
+    } finally {
+      setStatusUpdatingId(null);
     }
   };
 
@@ -347,8 +337,27 @@ export function InventoryManager({
         />
         <KpiCard
           title={text(lang, "Tồn kho theo size", "Stock by size")}
-          value={`${kpis.sizeCounts["CBST-300"]} / ${kpis.sizeCounts["CBST-400"]} / ${kpis.sizeCounts["CBST-600"]}`}
-          subtext={text(lang, "300g / 400g / 600g", "300g / 400g / 600g")}
+          value={
+            <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", margin: "2px 0" }}>
+              <span style={{ display: "inline-flex", alignItems: "baseline", gap: 3, background: "#fef3c7", padding: "2px 7px", borderRadius: 6 }}>
+                <strong style={{ fontSize: "1.2rem", fontWeight: 800, color: "#92400e" }}>{kpis.availableSizeCounts["CBST-300"]}</strong>
+                <small style={{ fontSize: "0.75rem", fontWeight: 600, color: "#b45309" }}>hũ 300g</small>
+              </span>
+              <span style={{ display: "inline-flex", alignItems: "baseline", gap: 3, background: "#fef3c7", padding: "2px 7px", borderRadius: 6 }}>
+                <strong style={{ fontSize: "1.2rem", fontWeight: 800, color: "#92400e" }}>{kpis.availableSizeCounts["CBST-400"]}</strong>
+                <small style={{ fontSize: "0.75rem", fontWeight: 600, color: "#b45309" }}>hũ 400g</small>
+              </span>
+              <span style={{ display: "inline-flex", alignItems: "baseline", gap: 3, background: "#fef3c7", padding: "2px 7px", borderRadius: 6 }}>
+                <strong style={{ fontSize: "1.2rem", fontWeight: 800, color: "#92400e" }}>{kpis.availableSizeCounts["CBST-600"]}</strong>
+                <small style={{ fontSize: "0.75rem", fontWeight: 600, color: "#b45309" }}>hũ 600g</small>
+              </span>
+            </div>
+          }
+          subtext={text(
+            lang,
+            `Khả dụng bán · Tổng kho: ${kpis.sizeCounts["CBST-300"]} / ${kpis.sizeCounts["CBST-400"]} / ${kpis.sizeCounts["CBST-600"]}`,
+            `Available to sell · Total: ${kpis.sizeCounts["CBST-300"]} / ${kpis.sizeCounts["CBST-400"]} / ${kpis.sizeCounts["CBST-600"]}`,
+          )}
           icon={Package}
           variant="amber"
         />
@@ -648,15 +657,30 @@ export function InventoryManager({
                       )}
                     </td>
                     <td>
-                      {isQuarantined ? (
-                        <span className="badge danger">
-                          {text(lang, "Cách ly", "Quarantined")}
-                        </span>
-                      ) : (
-                        <span className="badge success">
-                          {text(lang, "Khả dụng", "Available")}
-                        </span>
-                      )}
+                      <button
+                        type="button"
+                        disabled={statusUpdatingId === b.id}
+                        onClick={() => handleToggleStatus(b.id, b.status)}
+                        className={`badge ${isQuarantined ? "danger" : "success"}`}
+                        style={{
+                          cursor: "pointer",
+                          border: "none",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          transition: "opacity 0.2s",
+                          opacity: statusUpdatingId === b.id ? 0.6 : 1,
+                        }}
+                        title={text(
+                          lang,
+                          isQuarantined ? "Nhấn để chuyển sang Khả dụng" : "Nhấn để đưa vào Cách ly",
+                          isQuarantined ? "Click to set Available" : "Click to Quarantine",
+                        )}
+                      >
+                        {isQuarantined
+                          ? text(lang, "Cách ly (Bấm mở)", "Quarantined (Click to activate)")
+                          : text(lang, "Khả dụng", "Available")}
+                      </button>
                     </td>
                     <td style={{ textAlign: "center" }}>
                       {available > 0 && (
@@ -858,14 +882,22 @@ export function InventoryManager({
                 <div className="cbst-calc-row total">
                   <span>{text(lang, "Tổng giá vốn phiếu nhập:", "Total landed cost:")}</span>
                   <span className="cbst-calc-total-val">
-                    {money(receiptSubtotal + shippingFeeVnd, lang)}
+                    {money(receiptCostPreview.totalCostVnd, lang)}
                   </span>
                 </div>
 
+                {receiptCostPreview.policyError && (
+                  <div className="notice error" role="alert">
+                    {text(lang,
+                      "Chưa thể phân bổ cước cho hàng có tổng tiền bằng 0. Cần phê duyệt chính sách phân bổ trước khi nhập kho.",
+                      "Freight allocation for zero-value goods requires an approved policy before receipt.")}
+                    <small>{receiptCostPreview.policyError}</small>
+                  </div>
+                )}
                 {allocationPreview.length > 0 && shippingFeeVnd > 0 && (
                   <div className="cbst-preview-allocations">
                     <small style={{ fontWeight: 600, color: "#78716c", display: "block", marginBottom: 4 }}>
-                      {text(lang, "Dự kiến giá vốn sau cước:", "Projected unit cost with shipping:")}
+                      {text(lang, "Dự kiến các lô giá vốn sau cước:", "Projected landed-cost batches:")}
                     </small>
                     {allocationPreview.map((item) => (
                       <div key={item.id} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.82rem" }}>
@@ -873,8 +905,13 @@ export function InventoryManager({
                           {item.sku.replace("CBST-", "")}g ({item.qty} hũ):
                         </span>
                         <span>
-                          +{(item.landedUnitCost - item.purchasePriceVnd).toLocaleString("vi-VN")}đ/hũ →{" "}
-                          <strong>{money(item.landedUnitCost, lang)}</strong>
+                          {item.buckets.map((bucket, index) => (
+                            <React.Fragment key={bucket.landedUnitCostVnd}>
+                              {index > 0 && " + "}
+                              {bucket.qty} × <strong>{money(bucket.landedUnitCostVnd, lang)}</strong>
+                            </React.Fragment>
+                          ))}
+                          {" = "}{money(item.totalCostVnd, lang)}
                         </span>
                       </div>
                     ))}
@@ -896,7 +933,7 @@ export function InventoryManager({
             <button
               type="submit"
               className="button primary"
-              disabled={receiptSubmitting}
+              disabled={receiptSubmitting || Boolean(receiptCostPreview.policyError)}
             >
               {receiptSubmitting
                 ? text(lang, "Đang xử lý...", "Processing...")

@@ -11,14 +11,6 @@ function splitPricingGuard(payload: unknown): { base: unknown; guard?: PricingGu
     : undefined;
   return guard ? { base, guard } : { base: payload };
 }
-export function clearCheckoutRetry(store: Store, slotName = "cbst-checkout-retry") {
-  try {
-    store.removeItem(slotName);
-  } catch {
-    /* ignore */
-  }
-}
-
 export function createCheckout(store: Store, fetcher: typeof fetch = fetch, slotName = "cbst-checkout-retry") {
   let busy = false;
   return async (payload: unknown, actorId?: string) => {
@@ -32,8 +24,8 @@ export function createCheckout(store: Store, fetcher: typeof fetch = fetch, slot
         saved = raw;
         previous = raw ? JSON.parse(raw) : null;
         if (
-          previous &&
-          (!/^[a-f0-9]{64}$/.test(previous.fingerprint) ||
+          raw !== null &&
+          (!previous || !/^[a-f0-9]{64}$/.test(previous.fingerprint) ||
             ![previous.salt, previous.key, previous.guest].every(
               (value) =>
                 typeof value === "string" &&
@@ -48,6 +40,7 @@ export function createCheckout(store: Store, fetcher: typeof fetch = fetch, slot
       } catch {
         throw new Error("RETRY_STORAGE_UNAVAILABLE");
       }
+      const wasUncertain = previous !== null;
       const salt = previous?.salt ?? crypto.randomUUID();
       const submitted = splitPricingGuard(payload);
       const canonical = (value: unknown): unknown =>
@@ -90,6 +83,7 @@ export function createCheckout(store: Store, fetcher: typeof fetch = fetch, slot
         if (store.getItem(slotName) !== saved)
           throw new Error("CHECKOUT_RECONCILIATION_REQUIRED");
         store.setItem(slotName, JSON.stringify(retry));
+        if (store.getItem(slotName) !== JSON.stringify(retry)) throw new Error();
       } catch (error) {
         if (
           error instanceof Error &&
@@ -112,9 +106,9 @@ export function createCheckout(store: Store, fetcher: typeof fetch = fetch, slot
         fetcher,
       ).catch((error: unknown) => {
         if (
-          error instanceof ApiError &&
+          !wasUncertain && error instanceof ApiError &&
           ((error.status === 409 && error.code === "PRICE_STALE_CONFIRMATION_REQUIRED") ||
-           (error.status >= 400 && error.status < 500 && error.status !== 408 && error.status !== 429))
+           (error.status >= 400 && error.status < 500 && ![408, 409, 425, 429].includes(error.status)))
         ) {
           try {
             if (store.getItem(slotName) === JSON.stringify(retry)) store.removeItem(slotName);

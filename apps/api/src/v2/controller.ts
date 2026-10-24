@@ -3,7 +3,7 @@ import type { Response } from "express";
 import { AuthService } from "../auth/auth.service";
 import { CommerceService } from "./service";
 import { MongoRepository } from "./repository";
-import { AdjustmentDto, CheckoutDto, CostsDto, CreateUserDto, ExpenseDto, LoginDto, PageDto, PaymentDto, PayoutDto, ProductDto, ReceiptDto, RefundDto, TransitionDto, UserStatusDto, CreatePurchaseReceiptDto, UpdateCommissionRateDto, UpdateBankInfoDto, CreateKpiPolicyDto, CreateKpiPeriodDto, SettleKpiPeriodDto } from "./dto";
+import { AdjustmentDto, BatchStatusDto, CheckoutDto, CostsDto, CreateUserDto, ExpenseDto, LoginDto, PageDto, PaymentDto, PayoutDto, ProductDto, ReceiptDto, RefundDto, TransitionDto, UserStatusDto, CreatePurchaseReceiptDto, UpdateCommissionRateDto, UpdateBankInfoDto, CreateKpiPolicyDto, CreateKpiPeriodDto, SettleKpiPeriodDto } from "./dto";
 import { Owner, Public, requestKey, type ApiRequest } from "./http";
 import { AssignOrderDto, CreateProductDto, EditOrderDto, ResetPasswordDto, ReturnDto } from "./dto";
 import { PasswordResetService } from "./password-reset";
@@ -88,6 +88,8 @@ export class CommerceController {
   purchaseReceipt(@Req() req: ApiRequest, @Body() dto: CreatePurchaseReceiptDto) { return this.service.createPurchaseReceipt(req.actor, dto, requestKey(req), req.requestId); }
   @Owner() @Get("inventory/purchase-receipts") purchaseReceipts(@Req() req: ApiRequest, @Query() query: PageDto) { const { page, limit } = pagination(query); return this.service.listPurchaseReceipts(req.actor, page, limit); }
   @Owner() @Post("inventory/adjustments") adjustment(@Req() req: ApiRequest, @Body() dto: AdjustmentDto) { return this.service.adjustment(req.actor, dto, requestKey(req), req.requestId); }
+  @Owner() @Patch("inventory/batches/:id/status") batchStatus(@Req() req: ApiRequest, @Param("id", new ParseUUIDPipe()) id: string, @Body() dto: BatchStatusDto) { return this.service.updateBatchStatus(req.actor, id, dto.status, requestKey(req), req.requestId); }
+  @Get("inventory/availability") availability() { return this.service.getInventoryAvailability(); }
   @Owner() @Get("inventory/batches") batches(@Query() query: PageDto) { const { page, limit } = pagination(query); return this.db.batches.find({}, { _id: 0, id: 1, sku: 1, lotCode: 1, receivedAt: 1, expiresAt: 1, onHand: 1, reserved: 1, landedUnitCostVnd: 1, status: 1, receiptCode: 1, supplierLotCode: 1, purchasePriceVnd: 1, allocatedShippingVnd: 1 }).sort({ receivedAt: -1, id: 1 }).skip(page * limit).limit(limit).lean(); }
   @Owner() @Get("inventory/movements") movements(@Query() query: PageDto) { const { page, limit } = pagination(query); return this.db.movements.find({}, { _id: 0, id: 1, batchId: 1, sku: 1, orderId: 1, type: 1, qtyDelta: 1, reservedDelta: 1, actorId: 1, createdAt: 1 }).sort({ createdAt: -1, id: 1 }).skip(page * limit).limit(limit).lean(); }
   @Owner() @Get("users") users(@Query() query: PageDto) { const { page, limit } = pagination(query); return this.db.users.find({}, { _id: 0, id: 1, displayName: 1, emailNormalized: 1, role: 1, status: 1, commissionRateBps: 1, bankInfo: 1 }).sort({ id: 1 }).skip(page * limit).limit(limit).lean(); }
@@ -99,6 +101,7 @@ export class CommerceController {
   updateBankInfo(@Req() req: ApiRequest, @Param("id", new ParseUUIDPipe()) id: string, @Body() dto: UpdateBankInfoDto) { return this.service.updateBankInfo(req.actor, id, dto, requestKey(req), req.requestId); }
   @Owner() @Post("expenses") expense(@Req() req: ApiRequest, @Body() dto: ExpenseDto) { return this.service.expense(req.actor, dto, requestKey(req), req.requestId); }
   @Owner() @Get("expenses") expenses(@Query() query: PageDto) { const { page, limit } = pagination(query); return this.db.ledger.find({ kind: "EXPENSE" }, { _id: 0, id: 1, orderId: 1, amountVnd: 1, scope: 1, category: 1, reason: 1, createdAt: 1, actorId: 1 }).sort({ createdAt: -1, id: 1 }).skip(page * limit).limit(limit).lean(); }
+  @Owner() @Delete("expenses/:id") deleteExpense(@Req() req: ApiRequest, @Param("id", new ParseUUIDPipe()) id: string) { return this.service.deleteExpense(req.actor, id, requestKey(req), req.requestId); }
   @Get("commissions/me") commissionsMe(@Req() req: ApiRequest, @Query() query: PageDto) { const { page, limit } = pagination(query); return this.db.ledger.find({ memberId: req.actor.id, kind: { $in: ["COMMISSION", "PAYOUT", "KPI_BONUS"] } }, { _id: 0, id: 1, orderId: 1, kind: 1, amountVnd: 1, reason: 1, reference: 1, createdAt: 1 }).sort({ createdAt: -1, id: 1 }).skip(page * limit).limit(limit).lean(); }
   @Owner() @Get("commissions") commissions(@Query() query: PageDto) { const { page, limit } = pagination(query); return this.db.ledger.find({ kind: { $in: ["COMMISSION", "PAYOUT", "KPI_BONUS"] } }, { _id: 0, id: 1, memberId: 1, orderId: 1, kind: 1, amountVnd: 1, reason: 1, reference: 1, createdAt: 1 }).sort({ createdAt: -1, id: 1 }).skip(page * limit).limit(limit).lean(); }
   @Owner() @Post("commissions/payouts") payout(@Req() req: ApiRequest, @Body() dto: PayoutDto) { return this.service.payout(req.actor, dto.memberId, dto.reference, requestKey(req), req.requestId, dto.amountVnd, dto.period, dto.note); }

@@ -24,12 +24,15 @@ const routes: [RegExp, string[]][] = [
     /^orders\/[0-9a-f-]{36}\/(?:transitions|payments|refunds|finalize-costs|recalculate-commission|assignment|returns)$/,
     ["POST"],
   ],
-  [/^inventory\/(?:receipts|adjustments|purchase-receipts)$/, ["POST"]],
-  [/^inventory\/(?:batches|movements|purchase-receipts)$/, ["GET"]],
+  [/^inventory\/purchase-receipts$/, ["GET", "POST"]],
+  [/^inventory\/(?:receipts|adjustments)$/, ["POST"]],
+  [/^inventory\/(?:batches|movements|availability)$/, ["GET"]],
+  [/^inventory\/batches\/[0-9a-f-]{36}\/status$/, ["PATCH"]],
   [/^users$/, ["GET", "POST"]],
   [/^users\/[0-9a-f-]{36}(?:\/(?:commission-rate|bank-info))?$/, ["PATCH"]],
   [/^users\/[0-9a-f-]{36}\/password-reset$/, ["POST"]],
   [/^expenses$/, ["GET", "POST"]],
+  [/^expenses\/[0-9a-f-]{36}$/, ["DELETE"]],
   [/^commissions(?:\/me)?$/, ["GET"]],
   [/^commissions\/payouts$/, ["POST"]],
   [/^kpi\/(?:policies|periods)$/, ["GET", "POST"]],
@@ -86,10 +89,11 @@ export async function proxy(
     segments.some((part) => !/^[A-Za-z0-9-]+$/.test(part))
   )
     return fail(404, "NOT_FOUND");
-  const route = routes.find(([pattern]) => pattern.test(path));
-  if (!route) return fail(404, "NOT_FOUND");
+  const matchingRoutes = routes.filter(([pattern]) => pattern.test(path));
+  if (!matchingRoutes.length) return fail(404, "NOT_FOUND");
+  const route = matchingRoutes.find(([, methods]) => methods.includes(request.method));
   if (
-    !route[1].includes(request.method) ||
+    !route ||
     (request.method === "PATCH" && path === "products")
   )
     return fail(405, "METHOD_NOT_ALLOWED");

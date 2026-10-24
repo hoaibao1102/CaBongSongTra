@@ -7,7 +7,7 @@ import { computePricing, returnCredit, safeQuote } from "./pricing";
 import { DiscountsService } from "./discounts";
 import { commissionTarget, orderProjection, orderScope, paymentDue, type Actor } from "./policy";
 import type { AdjustmentDto, CheckoutDto, CreateUserDto, ExpenseDto, PaymentDto, ProductDto, ReceiptDto, RefundDto, TransitionDto, CreatePurchaseReceiptDto, UpdateCommissionRateDto, UpdateBankInfoDto, CreateKpiPolicyDto, CreateKpiPeriodDto, SettleKpiPeriodDto } from "./dto";
-import type { Batch, Ledger, Order, Product, PurchaseReceipt, PurchaseReceiptItem, KpiPolicy, KpiPeriod, KpiAward, KpiTier } from "./models";
+import type { Batch, Ledger, Order, Product, PurchaseReceipt, PurchaseReceiptItem, KpiPolicy, KpiPeriod, KpiAward } from "./models";
 import type { InternalCheckoutDto, InternalQuoteDto, PublicQuoteDto } from "./dto";
 import type { AssignOrderDto, CreateProductDto, EditOrderDto, ReturnDto } from "./dto";
 
@@ -17,7 +17,7 @@ export function allocateReceiptShipping<T extends { sku: string; qty: number; pu
 ) {
   const lineTotals = items.map(item => item.qty * item.purchasePriceVnd);
   const subtotalVnd = lineTotals.reduce((sum, val) => sum + val, 0);
-  if (subtotalVnd === 0 || shippingFeeVnd === 0) {
+  if (shippingFeeVnd === 0) {
     return items.map((item, idx) => ({
       ...item,
       lineTotalVnd: lineTotals[idx],
@@ -25,18 +25,23 @@ export function allocateReceiptShipping<T extends { sku: string; qty: number; pu
       landedUnitCostVnd: item.purchasePriceVnd,
     }));
   }
+  // No approved allocation basis exists for all-free goods with freight.
+  // Reject before persistence rather than dropping cost or inventing a policy.
+  if (subtotalVnd === 0) throw new ConflictException("ZERO_VALUE_FREIGHT_ALLOCATION_POLICY_REQUIRED");
+  const weights = lineTotals;
+  const totalWeight = weights.reduce((sum, value) => sum + value, 0);
   let allocatedSum = 0;
-  const allocations = lineTotals.map(lineTotal => {
-    const share = Math.floor((shippingFeeVnd * lineTotal) / subtotalVnd);
+  const allocations = weights.map(weight => {
+    const share = Math.floor((shippingFeeVnd * weight) / totalWeight);
     allocatedSum += share;
     return share;
   });
   const remainder = shippingFeeVnd - allocatedSum;
   let maxIdx = 0;
-  let maxVal = lineTotals[0];
-  for (let i = 1; i < lineTotals.length; i++) {
-    if (lineTotals[i] > maxVal) {
-      maxVal = lineTotals[i];
+  let maxVal = weights[0];
+  for (let i = 1; i < weights.length; i++) {
+    if (weights[i] > maxVal) {
+      maxVal = weights[i];
       maxIdx = i;
     }
   }
@@ -285,6 +290,18 @@ export class CommerceService {
       if (from === dto.status) return { id, status: order.status, version: order.version };
       const now = new Date();
       const wasShipped = !!order.shippedAt;
+      const reactivating = ["PENDING", "CONFIRMED", "PACKING", "SHIPPING", "DELIVERED", "DELIVERY_FAILED"].includes(dto.status);
+      // Physical return quantities survive administrative status corrections.
+      // Resending requires a new order/fulfillment, not a fictional status-only outbound.
+      if (reactivating && order.allocations.some(allocation => (allocation.returnedQty ?? 0) > 0)) {
+        throw new ConflictException("PHYSICAL_RETURN_REQUIRES_NEW_ORDER");
+      }
+      if (reactivating && wasShipped && (from === "CANCELLED" || order.shippedCancellationAt)) {
+        throw new ConflictException("SHIPPED_CANCELLATION_REQUIRES_RECONCILIATION");
+      }
+      if (wasShipped && ["PENDING", "CONFIRMED", "PACKING"].includes(dto.status)) {
+        throw new ConflictException("SHIPPED_ORDER_CANNOT_RETURN_TO_PREFULFILLMENT");
+      }
       const ship = ["SHIPPING", "DELIVERED", "DELIVERY_FAILED"].includes(dto.status) && !wasShipped;
       const needsReservation = ["CONFIRMED", "PACKING", "SHIPPING", "DELIVERED", "DELIVERY_FAILED"].includes(dto.status);
       if (needsReservation && !wasShipped && !["CONFIRMED", "PACKING"].includes(from)) {
@@ -304,7 +321,11 @@ export class CommerceService {
         if (ship) order.shippedAt = now;
         if (release) { order.allocations = []; order.cogsVnd = 0; }
       }
-      if (dto.status === "DELIVERED") order.deliveredAt = now;
+      // Recognition time is an immutable historical fact for this fulfillment.
+      if (dto.status === "DELIVERED" && !order.deliveredAt) order.deliveredAt = now;
+      if (wasShipped && (from === "CANCELLED" || dto.status === "CANCELLED") && !order.shippedCancellationAt) {
+        order.shippedCancellationAt = now;
+      }
       // Returns change workflow only. Physical return receipt requires an explicit inspected adjustment.
       order.status = dto.status;
       await this.reconcile(order, actor, session);
@@ -355,7 +376,15 @@ export class CommerceService {
           throw new BadRequestException("INVALID_BATCH_DATES");
         }
       }
-      const allocatedItems = allocateReceiptShipping(dto.items, dto.shippingFeeVnd);
+      // Receipt items describe actual integer-cost batches, not input rows.
+      const allocatedItems = allocateReceiptShipping(dto.items, dto.shippingFeeVnd).flatMap(item => {
+        const higherQty = item.allocatedShippingVnd % item.qty;
+        const lowerQty = item.qty - higherQty;
+        const unitShipping = item.landedUnitCostVnd - item.purchasePriceVnd;
+        const lower = { ...item, qty: lowerQty, lineTotalVnd: lowerQty * item.purchasePriceVnd, allocatedShippingVnd: lowerQty * unitShipping };
+        if (!higherQty) return [lower];
+        return [lower, { ...item, qty: higherQty, lineTotalVnd: higherQty * item.purchasePriceVnd, allocatedShippingVnd: higherQty * (unitShipping + 1), landedUnitCostVnd: item.landedUnitCostVnd + 1 }];
+      });
       const subtotalVnd = allocatedItems.reduce((sum, item) => sum + item.lineTotalVnd, 0);
       const totalCostVnd = subtotalVnd + dto.shippingFeeVnd;
 
@@ -373,8 +402,8 @@ export class CommerceService {
         const batchId = randomUUID();
         const weight = item.sku.replace("CBST-", "");
         const lotCode = `LOT-${y}${m}${d}-${codeSuffix}-${weight}-${i + 1}`;
-        const expiresAt = item.expiresAt ? new Date(item.expiresAt) : undefined;
-        const status = expiresAt && item.supplierLotCode ? "AVAILABLE" : "QUARANTINED";
+        const expiresAt = item.expiresAt ? new Date(item.expiresAt) : new Date(receivedDate.getTime() + 180 * 24 * 60 * 60 * 1000);
+        const status = "AVAILABLE";
 
         await this.db.batches.create([{
           id: batchId,
@@ -382,7 +411,7 @@ export class CommerceService {
           lotCode,
           receivedAt: receivedDate,
           expiresAt,
-          labelReference: item.supplierLotCode,
+          labelReference: item.supplierLotCode || receiptCode,
           onHand: item.qty,
           reserved: 0,
           landedUnitCostVnd: item.landedUnitCostVnd,
@@ -443,15 +472,54 @@ export class CommerceService {
     this.owner(actor);
     return this.db.purchaseReceipts.find({}, { _id: 0 }).sort({ receivedAt: -1, createdAt: -1 }).skip(page * limit).limit(limit).lean();
   }
+  async getInventoryAvailability() {
+    const now = new Date();
+    if (typeof this.db.batches?.aggregate === "function") {
+      const stocks = await this.db.batches.aggregate<{ _id: string; available: number; nearestExpiry: Date | null; unitCost: number }>([
+        { $match: { status: "AVAILABLE", expiresAt: { $gt: now } } },
+        {
+          $group: {
+            _id: "$sku",
+            available: { $sum: { $subtract: ["$onHand", "$reserved"] } },
+            nearestExpiry: { $min: "$expiresAt" },
+            unitCost: { $avg: "$purchasePriceVnd" },
+          },
+        },
+      ]);
+      const stockMap: Record<string, { available: number; nearestExpiry: string | null; estimatedUnitCostVnd: number }> = {};
+      for (const s of stocks) {
+        stockMap[s._id] = {
+          available: Math.max(0, s.available ?? 0),
+          nearestExpiry: s.nearestExpiry ? new Date(s.nearestExpiry).toISOString().slice(0, 10) : null,
+          estimatedUnitCostVnd: Math.round(s.unitCost ?? 0),
+        };
+      }
+      return stockMap;
+    }
+    return {};
+  }
   async receipt(actor: Actor, dto: ReceiptDto, key: string, requestId: string) {
     this.owner(actor);
     return this.db.idempotent(`${actor.id}:receipt`, key, dto, async session => {
       if (new Date(dto.receivedAt) > new Date() || (dto.expiresAt && new Date(dto.expiresAt) <= new Date(dto.receivedAt))) throw new BadRequestException("INVALID_BATCH_DATES");
       const id = randomUUID();
-      const status = dto.expiresAt && dto.labelReference ? "AVAILABLE" : "QUARANTINED";
-      await this.db.batches.create([{ id, sku: dto.sku, lotCode: dto.lotCode, receivedAt: new Date(dto.receivedAt), expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : undefined, labelReference: dto.labelReference, onHand: dto.qty, reserved: 0, landedUnitCostVnd: dto.landedUnitCostVnd, status }], { session });
+      const received = new Date(dto.receivedAt);
+      const expiresAt = dto.expiresAt ? new Date(dto.expiresAt) : new Date(received.getTime() + 180 * 24 * 60 * 60 * 1000);
+      const status = "AVAILABLE";
+      await this.db.batches.create([{ id, sku: dto.sku, lotCode: dto.lotCode, receivedAt: received, expiresAt, labelReference: dto.labelReference || dto.lotCode, onHand: dto.qty, reserved: 0, landedUnitCostVnd: dto.landedUnitCostVnd, status }], { session });
       await this.db.movements.create([{ id: randomUUID(), batchId: id, sku: dto.sku, type: "RECEIPT", reason: "GOODS_RECEIVED", qtyDelta: dto.qty, reservedDelta: 0, actorId: actor.id, createdAt: new Date() }], { session });
       await this.audit(actor, "INVENTORY_RECEIPT", id, requestId, session); return { id, status };
+    });
+  }
+  async updateBatchStatus(actor: Actor, id: string, status: "AVAILABLE" | "QUARANTINED", key: string, requestId: string) {
+    this.owner(actor);
+    if (!["AVAILABLE", "QUARANTINED"].includes(status)) throw new BadRequestException("INVALID_STATUS");
+    return this.db.idempotent(`${actor.id}:batch-status:${id}`, key, { status }, async session => {
+      const batch = await this.db.batches.findOne({ id }).session(session).lean();
+      if (!batch) throw new NotFoundException("RESOURCE_NOT_FOUND");
+      await this.db.batches.updateOne({ id }, { status }, { session });
+      await this.audit(actor, "BATCH_STATUS_UPDATED", id, requestId, session, batch.status, status);
+      return { id, status };
     });
   }
   async adjustment(actor: Actor, dto: AdjustmentDto, key: string, requestId: string) {
@@ -477,6 +545,22 @@ export class CommerceService {
       }
       const entry = await this.entry(actor, { kind: "EXPENSE", amountVnd: dto.amountVnd, scope: dto.scope, orderId: dto.orderId, category: dto.category, reason: dto.reason }, session);
       await this.audit(actor, "EXPENSE", entry.id, requestId, session); return { id: entry.id, amountVnd: entry.amountVnd };
+    });
+  }
+  async deleteExpense(actor: Actor, id: string, key: string, requestId: string) {
+    this.owner(actor);
+    return this.db.idempotent(`${actor.id}:delete-expense:${id}`, key, {}, async session => {
+      const exp = await this.db.ledger.findOne({ id, kind: "EXPENSE" }).session(session).lean();
+      if (!exp) throw new NotFoundException("RESOURCE_NOT_FOUND");
+      if (exp.orderId) {
+        const order = await this.db.scopedOrder(exp.orderId, {}, session);
+        order.directCostsVnd = Math.max(0, (order.directCostsVnd || 0) - exp.amountVnd);
+        await this.reconcile(order, actor, session);
+        await this.db.saveOrder(order, order.version, session);
+      }
+      await this.db.ledger.deleteOne({ id }).session(session);
+      await this.audit(actor, "EXPENSE_DELETED", id, requestId, session, String(exp.amountVnd), "0");
+      return { id, deleted: true };
     });
   }
   async recalculateCommission(actor: Actor, id: string, expectedVersion: number, key: string, requestId: string) {
@@ -565,11 +649,11 @@ export class CommerceService {
       ...scope,
       status: { $nin: ["DELIVERED", "CANCELLED", "RETURNED"] },
     });
-    const [cash] = actor.role === "OWNER_ADMIN" ? await this.db.ledger.aggregate([{ $group: { _id: null, cashMovementVnd: { $sum: { $switch: { branches: [{ case: { $eq: ["$kind", "PAYMENT"] }, then: "$amountVnd" }, { case: { $in: ["$kind", ["REFUND", "EXPENSE", "PAYOUT"]] }, then: { $multiply: ["$amountVnd", -1] } }], default: 0 } } }, overheadVnd: { $sum: { $cond: [{ $and: [{ $eq: ["$kind", "EXPENSE"] }, { $eq: ["$scope", "OVERHEAD"] }] }, "$amountVnd", 0] } } } }]) : [];
+    const [cash] = actor.role === "OWNER_ADMIN" ? await this.db.ledger.aggregate([{ $group: { _id: null, cashMovementVnd: { $sum: { $switch: { branches: [{ case: { $eq: ["$kind", "PAYMENT"] }, then: "$amountVnd" }, { case: { $in: ["$kind", ["REFUND", "EXPENSE", "PAYOUT"]] }, then: { $multiply: ["$amountVnd", -1] } }], default: 0 } } }, kpiBonusVnd: { $sum: { $cond: [{ $eq: ["$kind", "KPI_BONUS"] }, "$amountVnd", 0] } }, overheadVnd: { $sum: { $cond: [{ $and: [{ $eq: ["$kind", "EXPENSE"] }, { $eq: ["$scope", "OVERHEAD"] }] }, "$amountVnd", 0] } } } }]) : [];
     const [losses] = actor.role === "OWNER_ADMIN" ? await this.db.orders.aggregate([{ $match: { deliveredAt: { $exists: false }, status: "RETURNED", shippedAt: { $exists: true } } }, { $group: { _id: null, inventoryLossVnd: { $sum: "$cogsVnd" }, directCostsVnd: { $sum: "$directCostsVnd" } } }]) : [];
     const failedDeliveryLossVnd = (losses?.inventoryLossVnd ?? 0) + (losses?.directCostsVnd ?? 0);
     return { asOf: new Date().toISOString(), timezone: "Asia/Ho_Chi_Minh", deliveredOrders: totals?.deliveredOrders ?? 0, revenueVnd: totals?.revenueVnd ?? 0, commissionVnd: totals?.commissionVnd ?? 0, pendingCostOrders: processingOrders,
-      ...(actor.role === "OWNER_ADMIN" ? { failedDeliveryLossVnd, failedDeliveryInventoryLossVnd: losses?.inventoryLossVnd ?? 0, failedDeliveryDirectCostsVnd: losses?.directCostsVnd ?? 0, cogsVnd: totals?.cogsVnd ?? 0, directCostsVnd: totals?.directCostsVnd ?? 0, overheadVnd: cash?.overheadVnd ?? 0, operatingCashMovementVnd: cash?.cashMovementVnd ?? 0, netProfitVnd: (totals?.revenueVnd ?? 0) - (totals?.cogsVnd ?? 0) - (totals?.directCostsVnd ?? 0) - (totals?.commissionVnd ?? 0) - (cash?.overheadVnd ?? 0) - failedDeliveryLossVnd } : {}) };
+      ...(actor.role === "OWNER_ADMIN" ? { failedDeliveryLossVnd, failedDeliveryInventoryLossVnd: losses?.inventoryLossVnd ?? 0, failedDeliveryDirectCostsVnd: losses?.directCostsVnd ?? 0, cogsVnd: totals?.cogsVnd ?? 0, directCostsVnd: totals?.directCostsVnd ?? 0, overheadVnd: cash?.overheadVnd ?? 0, kpiBonusVnd: cash?.kpiBonusVnd ?? 0, operatingCashMovementVnd: cash?.cashMovementVnd ?? 0, netProfitVnd: (totals?.revenueVnd ?? 0) - (totals?.cogsVnd ?? 0) - (totals?.directCostsVnd ?? 0) - (totals?.commissionVnd ?? 0) - (cash?.overheadVnd ?? 0) - (cash?.kpiBonusVnd ?? 0) - failedDeliveryLossVnd } : {}) };
   }
   async getMediaState() {
     const slots = await this.db.mediaSlots.find({}, { _id: 0 }).lean();
@@ -678,11 +762,13 @@ export class CommerceService {
   }
 
   async getKpiPolicies(actor: Actor) {
+    void actor;
     return this.db.kpiPolicies.find().sort({ createdAt: -1 }).lean();
   }
 
   async createKpiPolicy(actor: Actor, dto: CreateKpiPolicyDto, key: string, requestId: string) {
     this.owner(actor);
+    if (dto.metric && dto.metric !== "PRODUCT_QTY") throw new BadRequestException("KPI_METRIC_UNSUPPORTED");
     const sortedTiers = [...dto.tiers].sort((a, b) => a.minQty - b.minQty);
     return this.db.idempotent(`${actor.id}:create-kpi-policy`, key, dto, async session => {
       const policy: KpiPolicy = {
@@ -702,6 +788,7 @@ export class CommerceService {
   }
 
   async getKpiPeriods(actor: Actor) {
+    void actor;
     return this.db.kpiPeriods.find().sort({ startDate: -1 }).lean();
   }
 
@@ -734,10 +821,7 @@ export class CommerceService {
     const orders = await this.db.orders.find({
       responsibleMemberId: memberId,
       status: { $in: ["DELIVERED", "PARTIALLY_RETURNED"] },
-      $or: [
-        { deliveredAt: { $gte: startDate, $lte: endDate } },
-        { deliveredAt: { $exists: false }, createdAt: { $gte: startDate, $lte: endDate } },
-      ],
+      deliveredAt: { $gte: startDate, $lt: endDate },
     }).session(session ?? null).lean();
 
     let totalDeliveredQty = 0;
@@ -750,6 +834,7 @@ export class CommerceService {
   }
 
   evaluateKpi(policy: KpiPolicy, totalQty: number) {
+    if (policy.metric !== "PRODUCT_QTY") throw new BadRequestException("KPI_METRIC_UNSUPPORTED");
     const sorted = [...policy.tiers].sort((a, b) => b.minQty - a.minQty);
     const achieved = sorted.find(t => totalQty >= t.minQty) || null;
     return {
@@ -762,27 +847,25 @@ export class CommerceService {
     this.owner(actor);
     const period = await this.db.kpiPeriods.findOne({ id: periodId }).lean();
     if (!period) throw new NotFoundException("KPI_PERIOD_NOT_FOUND");
+    if (period.status === "SETTLED") {
+      const snapshot = period.settlementSnapshot;
+      if (!snapshot || snapshot.version !== 1 || !snapshot.policy || !snapshot.startDate || !snapshot.endDate || !Array.isArray(snapshot.members)
+        || new Set(snapshot.members.map(m => m.memberId)).size !== snapshot.members.length
+        || snapshot.members.some(m => m.bonusVnd > 0 && !m.ledgerEntryId)
+        || snapshot.totalBonusVnd !== snapshot.members.reduce((sum, m) => sum + m.bonusVnd, 0)) {
+        throw new ConflictException("KPI_SETTLEMENT_SNAPSHOT_INCOMPLETE");
+      }
+      return { period: { ...period, startDate: snapshot.startDate, endDate: snapshot.endDate }, policy: snapshot.policy,
+        members: snapshot.members.map(m => ({ ...m, settled: true })), totalBonusVnd: snapshot.totalBonusVnd };
+    }
     const policy = await this.db.kpiPolicies.findOne({ id: period.policyId }).lean();
     if (!policy) throw new NotFoundException("KPI_POLICY_NOT_FOUND");
 
     const members = await this.db.users.find({ role: "MEMBER" }, { _id: 0, id: 1, displayName: 1, emailNormalized: 1, status: 1 }).lean();
-    const awards = period.status === "SETTLED" ? await this.db.kpiAwards.find({ periodId }).lean() : [];
-    const awardMap = new Map(awards.map(a => [a.memberId, a]));
 
     const memberResults = await Promise.all(
       members.map(async member => {
-        const existingAward = awardMap.get(member.id);
-        if (existingAward) {
-          return {
-            memberId: member.id,
-            displayName: member.displayName,
-            email: member.emailNormalized,
-            deliveredQty: existingAward.totalDeliveredQty,
-            achievedTierQty: existingAward.achievedTierQty ?? null,
-            bonusVnd: existingAward.bonusVnd,
-            settled: true,
-          };
-        }
+
         const { totalDeliveredQty } = await this.computeDeliveredQty(member.id, period.startDate, period.endDate);
         const { achievedTier, bonusVnd } = this.evaluateKpi(policy, totalDeliveredQty);
         return {
@@ -811,16 +894,26 @@ export class CommerceService {
       const period = await this.db.kpiPeriods.findOne({ id: periodId }).session(session).lean();
       if (!period) throw new NotFoundException("KPI_PERIOD_NOT_FOUND");
       if (period.status === "SETTLED") throw new ConflictException("KPI_PERIOD_ALREADY_SETTLED");
+      if (new Date() < period.endDate) throw new ConflictException("KPI_PERIOD_NOT_CLOSED");
       const policy = await this.db.kpiPolicies.findOne({ id: period.policyId }).session(session).lean();
       if (!policy) throw new NotFoundException("KPI_POLICY_NOT_FOUND");
 
+      this.evaluateKpi(policy, 0);
       const members = await this.db.users.find({ role: "MEMBER" }).session(session).lean();
       const awards: KpiAward[] = [];
+      const snapshot: NonNullable<KpiPeriod["settlementSnapshot"]> = {
+        version: 1, policy: {
+          id: policy.id, name: policy.name, periodType: policy.periodType, metric: policy.metric, active: policy.active,
+          tiers: policy.tiers.map(tier => ({ minQty: tier.minQty, bonusVnd: tier.bonusVnd })),
+          createdAt: new Date(policy.createdAt), updatedAt: new Date(policy.updatedAt),
+        }, startDate: period.startDate, endDate: period.endDate, members: [], totalBonusVnd: 0,
+      };
 
       for (const member of members) {
         const { totalDeliveredQty } = await this.computeDeliveredQty(member.id, period.startDate, period.endDate, session);
         const { achievedTier, bonusVnd } = this.evaluateKpi(policy, totalDeliveredQty);
 
+        let ledgerEntryId: string | undefined;
         if (bonusVnd > 0) {
           const entry = await this.entry(actor, {
             kind: "KPI_BONUS",
@@ -835,28 +928,33 @@ export class CommerceService {
             { session, upsert: true }
           );
 
-          awards.push({
+          ledgerEntryId = entry.id;
+        }
+        awards.push({
             id: randomUUID(),
             periodId: period.id,
             memberId: member.id,
             totalDeliveredQty,
             achievedTierQty: achievedTier?.minQty,
             bonusVnd,
-            ledgerEntryId: entry.id,
+            ledgerEntryId,
             createdAt: new Date(),
           });
-        }
+        snapshot.members.push({ memberId: member.id, displayName: member.displayName, email: member.emailNormalized,
+          status: member.status, deliveredQty: totalDeliveredQty, achievedTierQty: achievedTier?.minQty ?? null, bonusVnd, ledgerEntryId });
+        snapshot.totalBonusVnd += bonusVnd;
       }
 
       if (awards.length > 0) {
         await this.db.kpiAwards.create(awards, { session });
       }
 
-      await this.db.kpiPeriods.updateOne(
-        { id: periodId },
-        { $set: { status: "SETTLED", settledAt: new Date(), settledBy: actor.id } },
-        { session }
+      const result = await this.db.kpiPeriods.updateOne(
+        { id: periodId, status: "OPEN", settlementSnapshot: { $exists: false } },
+        { $set: { status: "SETTLED", settledAt: new Date(), settledBy: actor.id, settlementSnapshot: snapshot } },
+        { session, runValidators: true, overwriteImmutable: true }
       );
+      if (result.matchedCount !== 1) throw new ConflictException("KPI_PERIOD_ALREADY_SETTLED");
 
       await this.audit(actor, "KPI_PERIOD_SETTLED", periodId, requestId, session);
       return {
@@ -873,8 +971,8 @@ export class CommerceService {
     const period = await this.db.kpiPeriods.findOne({
       status: "OPEN",
       startDate: { $lte: now },
-      endDate: { $gte: now },
-    }).sort({ startDate: -1 }).lean() || await this.db.kpiPeriods.findOne({ status: "OPEN" }).sort({ startDate: -1 }).lean();
+      endDate: { $gt: now },
+    }).sort({ startDate: -1 }).lean();
 
     if (!period) {
       return { hasActivePeriod: false };
@@ -886,6 +984,7 @@ export class CommerceService {
     }
 
     const { totalDeliveredQty } = await this.computeDeliveredQty(actor.id, period.startDate, period.endDate);
+    this.evaluateKpi(policy, totalDeliveredQty);
     const sortedTiers = [...policy.tiers].sort((a, b) => a.minQty - b.minQty);
     const achievedTier = [...sortedTiers].reverse().find(t => totalDeliveredQty >= t.minQty) || null;
     const nextTier = sortedTiers.find(t => t.minQty > totalDeliveredQty) || null;

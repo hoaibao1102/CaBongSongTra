@@ -1,4 +1,5 @@
 "use client";
+import { useActorMutation } from "../operation-actor";
 
 import React, { useEffect, useRef, useState, useMemo, type FormEvent } from "react";
 import {
@@ -10,7 +11,7 @@ import {
   CheckCircle2,
   XCircle,
 } from "lucide-react";
-import { apiRequest, createMutation, skus } from "../commerce";
+import { apiRequest, skus } from "../commerce";
 import { errorText, text } from "../i18n";
 import { Modal } from "./Modal";
 import type { Lang, RecordRow } from "../types";
@@ -91,7 +92,8 @@ export function PromotionManager({ kind, owner, lang }: { kind: Kind; owner: boo
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
 
-  const mutate = useRef(createMutation());
+  const actorMutation = useActorMutation();
+  const mutate = useRef(actorMutation);
 
   useEffect(() => {
     let alive = true;

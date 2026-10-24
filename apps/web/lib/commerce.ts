@@ -483,14 +483,50 @@ export async function apiRequest<T = unknown>(
     );
   return data as T;
 }
-export function createMutation(fetcher: typeof fetch = fetch) {
+export function createMutation(fetcher: typeof fetch = fetch, options?: { store?: Pick<Storage, "getItem" | "setItem" | "removeItem">; actorId: string }) {
   const pending = new Map<string, string>();
+  if (options) return async (path: string, payload: unknown, method = "POST", guest?: string) => {
+    if (!options.actorId) throw new Error("OPERATION_ACTOR_REQUIRED");
+    const digest = async (value: string) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))), b => b.toString(16).padStart(2,"0")).join("");
+    const slot = `cbst-operation-v1:${await digest(options.actorId)}`;
+    let store: Pick<Storage, "getItem" | "setItem" | "removeItem">;
+    let raw: string | null;
+    let previous: { salt: string; fingerprint: string; key: string; uncertain: boolean; attempt?: string } | null;
+    try {
+      store = options.store ?? window.sessionStorage;
+      raw = store.getItem(slot);
+      previous = raw === null ? null : JSON.parse(raw);
+      if (raw !== null && (!previous || !/^[a-f0-9]{64}$/.test(previous.fingerprint) || ![previous.salt,previous.key].every(v=>typeof v === "string" && /^[A-Za-z0-9_-]{32,64}$/.test(v)) || typeof previous.uncertain !== "boolean" || (previous.attempt !== undefined && (typeof previous.attempt !== "string" || !/^[A-Za-z0-9_-]{32,64}$/.test(previous.attempt))))) throw new Error();
+    } catch { throw new Error("RETRY_STORAGE_UNAVAILABLE"); }
+    const canonical = (value: unknown): unknown => Array.isArray(value) ? value.map(canonical) : value && typeof value === "object" ? Object.fromEntries(Object.entries(value).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>[k,canonical(v)])) : value;
+    const salt = previous?.salt ?? crypto.randomUUID();
+    const fingerprint = await digest(`${salt}:${options.actorId}:${method}:${path}:${guest ?? ""}:${JSON.stringify(canonical(payload))}`);
+    if (previous && previous.fingerprint !== fingerprint) throw new Error("OPERATION_RECONCILIATION_REQUIRED");
+    const retry = previous ?? { salt, fingerprint, key: crypto.randomUUID(), uncertain: false };
+    const save = (value: typeof retry) => {
+      try { if (store.getItem(slot) !== raw) throw new Error("OPERATION_RECONCILIATION_REQUIRED"); store.setItem(slot, JSON.stringify(value)); raw = JSON.stringify(value); if (store.getItem(slot) !== raw) throw new Error(); }
+      catch (error) { if (error instanceof Error && error.message === "OPERATION_RECONCILIATION_REQUIRED") throw error; throw new Error("RETRY_STORAGE_UNAVAILABLE"); }
+    };
+    // Each dispatch owns a distinct durable record, even when reusing the same key.
+    // Earlier completions must not clear a newer in-flight replay's uncertainty.
+    save({ ...retry, uncertain: true, attempt: crypto.randomUUID() });
+    const release = () => { try { if (store.getItem(slot) === raw) store.removeItem(slot); } catch { /* Retain safe replay identity on cleanup failure. */ } };
+    try {
+      const result = await apiRequest(path, { method, headers: { "Content-Type":"application/json", "Idempotency-Key":retry.key, ...(guest ? { "X-Guest-Session":guest } : {}) }, body: JSON.stringify(payload) }, fetcher);
+      release(); return result;
+    } catch (error) {
+      // A rejection on a replay cannot establish whether the earlier attempt committed.
+      if (!retry.uncertain && error instanceof ApiError && error.status >= 400 && error.status < 500 && ![408,409,425,429].includes(error.status)) release();
+      throw error;
+    }
+  };
   return async (
     path: string,
     payload: unknown,
     method = "POST",
     guest?: string,
   ) => {
+    if (!["auth/login", "auth/reset-password"].includes(path)) throw new Error("OPERATION_ACTOR_REQUIRED");
     const body = JSON.stringify(payload);
     const signature = `${method}:${path}:${guest ?? ""}:${body}`;
     const key = pending.get(signature) ?? crypto.randomUUID();

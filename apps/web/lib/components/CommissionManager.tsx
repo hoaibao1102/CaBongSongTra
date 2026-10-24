@@ -1,4 +1,5 @@
 "use client";
+import { useActorMutation } from "../operation-actor";
 
 import React, { useState, useMemo, useEffect } from "react";
 import {
@@ -22,11 +23,11 @@ import { Modal } from "./Modal";
 import { CurrencyInput } from "./CurrencyInput";
 import { SearchableSelect } from "./SearchableSelect";
 import { KpiCard } from "./KpiCard";
-import { ApiError, createMutation } from "../commerce";
-import { money, text } from "../i18n";
+import { ApiError } from "../commerce";
+import { money, text, errorText } from "../i18n";
 import type { Lang, MemberUser, KpiPolicy, KpiPeriod, KpiTier } from "../types";
 
-const durableMutation = createMutation();
+
 
 export interface CommissionLedgerEntry {
   id: string;
@@ -54,6 +55,7 @@ export function CommissionManager({
   onRefresh,
   onUnauthorized,
 }: CommissionManagerProps) {
+  const durableMutation = useActorMutation();
   const [activeTab, setActiveTab] = useState<"PAYOUTS" | "KPI">("PAYOUTS");
 
   // Filters for Payouts Tab
@@ -285,7 +287,7 @@ export function CommissionManager({
     try {
       const payload = {
         memberId: selectedMemberId,
-        reference: reference.trim() || `PAY-${Date.now()}`,
+        reference: reference.trim() || "MANUAL-PAYOUT",
         amountVnd: payVal,
         period: period.trim() || undefined,
         note: payoutNote.trim() || undefined,
@@ -301,7 +303,7 @@ export function CommissionManager({
       } else if (err instanceof ApiError) {
         setPayoutError(err.message || "Không thể thực hiện chi trả.");
       } else {
-        setPayoutError("Đã xảy ra lỗi không xác định.");
+        setPayoutError(errorText(err, lang));
       }
     } finally {
       setPayoutSubmitting(false);
@@ -915,36 +917,38 @@ export function CommissionManager({
           </div>
 
           <div style={{ marginBottom: 16 }}>
-            <label>
-              <span>{text(lang, "Hình thức thanh toán", "Payout option")} <span className="required-mark" aria-hidden="true">*</span></span>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 6 }}>
-                <button
-                  type="button"
-                  className={`cbst-scope-card ${isFullPayout ? "selected" : ""}`}
-                  onClick={() => {
-                    setIsFullPayout(true);
-                    setPayoutAmount(availableBalance);
-                  }}
-                >
-                  <CheckCircle2 size={18} />
-                  <div>
-                    <strong>{text(lang, "Toàn bộ số dư", "Full Balance")}</strong>
-                    <small>{money(availableBalance, lang)}</small>
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  className={`cbst-scope-card ${!isFullPayout ? "selected" : ""}`}
-                  onClick={() => setIsFullPayout(false)}
-                >
-                  <Wallet size={18} />
-                  <div>
-                    <strong>{text(lang, "Thanh toán một phần", "Partial Payout")}</strong>
-                    <small>{text(lang, "Nhập số tiền tùy chọn", "Custom amount")}</small>
-                  </div>
-                </button>
-              </div>
-            </label>
+            <div style={{ marginBottom: 6 }}>
+              <span style={{ fontWeight: 600, fontSize: "0.9rem", color: "#374151" }}>
+                {text(lang, "Hình thức thanh toán", "Payout option")} <span className="required-mark" aria-hidden="true">*</span>
+              </span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <button
+                type="button"
+                className={`cbst-scope-card ${isFullPayout ? "selected" : ""}`}
+                onClick={() => {
+                  setIsFullPayout(true);
+                  setPayoutAmount(availableBalance);
+                }}
+              >
+                <CheckCircle2 size={18} />
+                <div>
+                  <strong>{text(lang, "Toàn bộ số dư", "Full Balance")}</strong>
+                  <small>{money(availableBalance, lang)}</small>
+                </div>
+              </button>
+              <button
+                type="button"
+                className={`cbst-scope-card ${!isFullPayout ? "selected" : ""}`}
+                onClick={() => setIsFullPayout(false)}
+              >
+                <Wallet size={18} />
+                <div>
+                  <strong>{text(lang, "Thanh toán một phần", "Partial Payout")}</strong>
+                  <small>{text(lang, "Nhập số tiền tùy chọn", "Custom amount")}</small>
+                </div>
+              </button>
+            </div>
           </div>
 
           {!isFullPayout && (

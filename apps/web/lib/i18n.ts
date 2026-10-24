@@ -135,6 +135,10 @@ export function errorText(error: unknown, lang: Lang) {
       "Còn yêu cầu chưa rõ kết quả trong tab này. Nội dung hoặc tài khoản mới chưa được gửi. Khôi phục đúng nội dung và tài khoản ban đầu để thử lại; nếu không thể, liên hệ cửa hàng xác minh. Không xóa dữ liệu phiên để bỏ qua kiểm tra.",
       "This tab has an unresolved checkout. Changed details or a different account were not sent. Restore the original details and account to retry, or contact the shop for reconciliation. Do not clear session storage to bypass this check.",
     );
+  if (error instanceof Error && error.message === "OPERATION_RECONCILIATION_REQUIRED")
+    return text(lang,
+      "Giao dịch trước chưa rõ kết quả. Khôi phục nội dung và tài khoản ban đầu để thử lại cùng mã; nếu không thể, cần đối soát với quản trị viên. Không xóa dữ liệu phiên hoặc đổi tài khoản để gửi thay thế.",
+      "A previous operation is unresolved. Restore the original payload and account to retry with the same key, or contact an administrator for reconciliation. Do not clear session storage or switch accounts to submit a replacement.");
   if (error instanceof Error && error.message === "RETRY_STORAGE_UNAVAILABLE")
     return text(
       lang,

@@ -1,4 +1,5 @@
 "use client";
+import { useActorMutation } from "../operation-actor";
 
 import React, { useState, useMemo } from "react";
 import {
@@ -9,10 +10,10 @@ import {
   Search,
 } from "lucide-react";
 import { Modal } from "./Modal";
-import { apiRequest, ApiError, createMutation } from "../commerce";
-import { text } from "../i18n";
+import { apiRequest, ApiError } from "../commerce";
+import { text, errorText } from "../i18n";
 import type { Lang, MemberUser } from "../types";
-const durableMutation = createMutation();
+
 
 export interface UserManagerProps {
   users: MemberUser[];
@@ -27,6 +28,7 @@ export function UserManager({
   onRefresh,
   onUnauthorized,
 }: UserManagerProps) {
+  const durableMutation = useActorMutation();
   // Modal states
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createName, setCreateName] = useState("");
@@ -86,7 +88,7 @@ export function UserManager({
       } else if (err instanceof ApiError) {
         setCreateError(err.message || "Không thể tạo thành viên.");
       } else {
-        setCreateError("Đã xảy ra lỗi không xác định.");
+        setCreateError(errorText(err, lang));
       }
     } finally {
       setCreateSubmitting(false);
@@ -116,7 +118,7 @@ export function UserManager({
       } else if (err instanceof ApiError) {
         setRateError(err.message || "Không thể cập nhật tỷ lệ hoa hồng.");
       } else {
-        setRateError("Đã xảy ra lỗi không xác định.");
+        setRateError(errorText(err, lang));
       }
     } finally {
       setRateSubmitting(false);
@@ -148,7 +150,7 @@ export function UserManager({
       } else if (err instanceof ApiError) {
         setBankError(err.message || "Không thể cập nhật thông tin ngân hàng.");
       } else {
-        setBankError("Đã xảy ra lỗi không xác định.");
+        setBankError(errorText(err, lang));
       }
     } finally {
       setBankSubmitting(false);
@@ -185,7 +187,7 @@ export function UserManager({
       } else if (err instanceof ApiError) {
         setTokenError(err.message || "Không thể cấp token.");
       } else {
-        setTokenError("Đã xảy ra lỗi.");
+        setTokenError(errorText(err, lang));
       }
     } finally {
       setTokenSubmitting(false);

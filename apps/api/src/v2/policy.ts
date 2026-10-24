@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { calculateCommission, type Role } from "../domain";
 import type { Order } from "./models";
-export type Actor = { id: string; role: Role; displayName?: string };
+export type Actor = { id: string; role: Role; displayName?: string; commissionRateBps?: number };
 export function orderScope(actor: Actor) { return actor.role === "OWNER_ADMIN" ? {} : { responsibleMemberId: actor.id }; }
 export function fingerprint(value: unknown): string {
   const canonical = (item: unknown): unknown => Array.isArray(item) ? item.map(canonical) : item && typeof item === "object" ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b)).map(([key, entry]) => [key, canonical(entry)])) : item;

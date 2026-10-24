@@ -46,8 +46,13 @@ describe("transactional commerce workflow", () => {
   });
   it.each(["PENDING", "CONFIRMED", "PACKING", "SHIPPING", "DELIVERED", "CANCELLED", "DELIVERY_FAILED", "RETURN_REQUESTED", "PARTIALLY_RETURNED", "RETURNED"] as const)("allows owner correction to %s without inventing a physical stock return", async (status) => {
     const { service, db } = setup("DELIVERED");
-    const result = await service.transition(owner, "order", { status, expectedVersion: 0, reason: "Correction" }, "key", "request");
-    expect(result.status).toBe(status);
+    const change = service.transition(owner, "order", { status, expectedVersion: 0, reason: "Correction" }, "key", "request");
+    if (["PENDING", "CONFIRMED", "PACKING"].includes(status)) {
+      await expect(change).rejects.toThrow("SHIPPED_ORDER_CANNOT_RETURN_TO_PREFULFILLMENT");
+      expect(db.saveOrder).not.toHaveBeenCalled();
+    } else {
+      expect((await change).status).toBe(status);
+    }
     expect(db.movements.create).not.toHaveBeenCalled();
   });
   it.each(["PENDING", "CONFIRMED", "PACKING", "SHIPPING", "DELIVERED", "CANCELLED", "DELIVERY_FAILED", "RETURN_REQUESTED", "PARTIALLY_RETURNED", "RETURNED"] as const)("lets a member move an assigned pending order directly to %s", async (status) => {

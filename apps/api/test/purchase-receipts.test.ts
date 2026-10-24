@@ -60,7 +60,7 @@ describe("Inventory Purchase Receipts - Label Safety", () => {
     const errors = await validate(plainToInstance(PurchaseReceiptItemDto, { sku: "CBST-300", qty: 1, purchasePriceVnd: 65000, supplierLotCode: "   " }));
     expect(errors.length).toBeGreaterThan(0);
   });
-  it("quarantines a batch that has expiry but no supplier label reference", async () => {
+  it("defaults imported batches to AVAILABLE status and receipt code labelReference", async () => {
     const created: Array<Record<string, unknown>> = [];
     const db = {
       idempotent: async (_scope: string, _key: string, _dto: unknown, work: (session: unknown) => unknown) => work("session"),
@@ -72,7 +72,7 @@ describe("Inventory Purchase Receipts - Label Safety", () => {
       { receivedAt: "2026-10-01T00:00:00.000Z", shippingFeeVnd: 0, items: [{ sku: "CBST-300", qty: 1, purchasePriceVnd: 65000, expiresAt: "2027-10-01T00:00:00.000Z" }] } as never,
       "receipt-key-123456", "request",
     );
-    expect(created[0]).toMatchObject({ status: "QUARANTINED" });
-    expect(created[0].labelReference).toBeUndefined();
+    expect(created[0]).toMatchObject({ status: "AVAILABLE" });
+    expect(created[0].labelReference).toMatch(/^PN-20261001-/);
   });
 });

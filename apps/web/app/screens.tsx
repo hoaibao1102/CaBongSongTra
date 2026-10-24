@@ -5,7 +5,7 @@ import { ContactButtons } from "../lib/components/ContactButtons";
 import { LandingImage } from "../lib/components/LandingImage";
 import { MemberCommissions } from "../lib/components/MemberCommissions";
 
-import { useContext, useEffect, useRef, useState, type FormEvent } from "react";
+import { useContext, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   useQuery,
   useQueryClient,
@@ -80,6 +80,7 @@ import {
   Tag,
   Ticket,
 } from "lucide-react";
+import { OperationActorContext, useActorMutation } from "../lib/operation-actor";
 import { createCheckout } from "../lib/checkout-retry";
 import { PricingReview, requestQuote, guardedPayload } from "../lib/components/PricingReview";
 import type { PricingQuote } from "../lib/pricing";
@@ -232,7 +233,8 @@ export function ActionForm({
   onUnauthorized?: () => void;
 }) {
   const definition = actions[action];
-  const mutate = useRef(createMutation());
+  const actorMutation = useActorMutation();
+  const authMutation = useRef(createMutation());
   const busyRef = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
@@ -249,7 +251,7 @@ export function ActionForm({
     busyRef.current = true;
     try {
       const payload = buildPayload(action, values);
-      const result = await mutate.current(
+      const result = await (action === "login" || action === "resetPassword" ? authMutation.current : actorMutation)(
         definition.path(id),
         payload,
         definition.method ?? "POST",
@@ -3232,6 +3234,170 @@ function CategoryBarWidget({
   );
 }
 
+export const SKU_BASE_COST: Record<string, number> = {
+  "CBST-300": 65000,
+  "CBST-400": 95000,
+  "CBST-600": 140000,
+};
+
+export function MemberInventoryWidget({
+  products = [],
+  actor,
+  lang,
+  onGoToCreate,
+}: {
+  products?: Product[];
+  actor: Actor;
+  lang: Lang;
+  onGoToCreate?: (sku?: string) => void;
+}) {
+  const [stockMap, setStockMap] = useState<Record<string, { available: number; nearestExpiry: string | null; estimatedUnitCostVnd?: number }>>({});
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    apiRequest<Record<string, { available: number; nearestExpiry: string | null; estimatedUnitCostVnd?: number }>>("inventory/availability")
+      .then((data) => {
+        if (active && data && typeof data === "object") {
+          setStockMap(data);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const commissionRate = actor.role === "MEMBER" ? ((actor.commissionRateBps ?? 4000) / 10000) : 0.4;
+  const commissionRatePercent = Math.round(commissionRate * 100);
+
+  return (
+    <div className="cbst-member-inventory-widget">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10 }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Boxes size={20} color="#D84012" strokeWidth={2.2} />
+            <h3 style={{ fontSize: "1.08rem", fontWeight: 700, color: "#1C1917", margin: 0 }}>
+              {text(lang, "Tình trạng kho hàng & Hoa hồng sản phẩm", "Live Warehouse Stock & Commissions")}
+            </h3>
+          </div>
+          <p style={{ margin: "4px 0 0", fontSize: "0.84rem", color: "#6B7280" }}>
+            {text(
+              lang,
+              "Hoa hồng được tính trên chênh lệch giữa giá bán và giá vốn sản phẩm (COGS). Nắm rõ tồn kho để tư vấn chuẩn xác.",
+              "Commission is calculated on profit margin (Retail Price minus COGS). Track live stock to sell confidently.",
+            )}
+          </p>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: "0.82rem", color: "#065F46", fontWeight: 700, background: "#ECFDF5", border: "1px solid #A7F3D0", padding: "4px 10px", borderRadius: 8 }}>
+            {text(lang, `Hoa hồng: ${commissionRatePercent}% lợi nhuận`, `Commission: ${commissionRatePercent}% on profit`)}
+          </span>
+        </div>
+      </div>
+
+      <div className="cbst-sku-grid">
+        {products.map((p) => {
+          const stock = stockMap[p.sku];
+          const available = stock?.available;
+          const isOutOfStock = available !== undefined && available <= 0;
+          const isLowStock = available !== undefined && available > 0 && available < 10;
+          const cost = stock?.estimatedUnitCostVnd || SKU_BASE_COST[p.sku] || 0;
+          const unitProfit = Math.max(0, p.retailPriceVnd - cost);
+          const perJarCommission = Math.round(unitProfit * commissionRate);
+
+          return (
+            <div key={p.sku} className="cbst-sku-card">
+              <div>
+                <div className="cbst-sku-header">
+                  <div>
+                    <h4 className="cbst-sku-name">{productName(p, lang)}</h4>
+                    <div className="cbst-sku-meta">
+                      {p.sku} · {p.netWeightG}g
+                    </div>
+                  </div>
+                  {available !== undefined ? (
+                    isOutOfStock ? (
+                      <span className="cbst-stock-badge out-of-stock">
+                        {text(lang, "Hết hàng", "Out of stock")}
+                      </span>
+                    ) : isLowStock ? (
+                      <span className="cbst-stock-badge low-stock">
+                        {text(lang, `Còn ${available} hũ`, `${available} left`)}
+                      </span>
+                    ) : (
+                      <span className="cbst-stock-badge in-stock">
+                        {text(lang, `Sẵn ${available} hũ`, `${available} ready`)}
+                      </span>
+                    )
+                  ) : loading ? (
+                    <span style={{ fontSize: "0.72rem", color: "#9CA3AF" }}>…</span>
+                  ) : null}
+                </div>
+
+                <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                    <span style={{ fontSize: "0.82rem", color: "#78716C" }}>
+                      {text(lang, "Giá bán lẻ:", "Retail price:")}
+                    </span>
+                    <strong style={{ fontSize: "0.98rem", color: "#1C1917" }}>
+                      {money(p.retailPriceVnd, lang)}
+                    </strong>
+                  </div>
+
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                    <span style={{ fontSize: "0.78rem", color: "#9CA3AF" }}>
+                      {text(lang, "Lợi nhuận định mức:", "Base profit:")}
+                    </span>
+                    <span style={{ fontSize: "0.85rem", color: "#4B5563", fontWeight: 600 }}>
+                      {money(unitProfit, lang)}
+                    </span>
+                  </div>
+
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", background: "#ECFDF5", padding: "6px 10px", borderRadius: 8, border: "1px solid #D1FAE5" }}>
+                    <span style={{ fontSize: "0.8rem", color: "#065F46", fontWeight: 600 }}>
+                      {text(lang, `Hoa hồng (${commissionRatePercent}%):`, `Commission (${commissionRatePercent}%):`)}
+                    </span>
+                    <strong style={{ fontSize: "0.98rem", color: "#047857" }}>
+                      +{money(perJarCommission, lang)}
+                    </strong>
+                  </div>
+
+                  {stock?.nearestExpiry && (
+                    <div style={{ fontSize: "0.75rem", color: "#6B7280", marginTop: 2 }}>
+                      {text(lang, `Lô hiện tại: HSD ${stock.nearestExpiry}`, `Current batch: Exp ${stock.nearestExpiry}`)}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                className={`cbst-sku-order-btn ${isOutOfStock ? "disabled" : ""}`}
+                disabled={isOutOfStock}
+                onClick={() => onGoToCreate?.(p.sku)}
+              >
+                {isOutOfStock ? (
+                  text(lang, "Tạm hết hàng", "Out of stock")
+                ) : (
+                  <>
+                    <PackagePlus size={16} strokeWidth={2.2} />
+                    <span>{text(lang, "Lên đơn hũ này", "Create order")}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function InternalOrderCreator({
   actor,
   lang,
@@ -3245,6 +3411,27 @@ export function InternalOrderCreator({
   onOrderCreated?: (order: RecordRow) => void;
   onGoToOrders?: () => void;
 }) {
+  const [stockAvailability, setStockAvailability] = useState<Record<string, { available: number; nearestExpiry: string | null; estimatedUnitCostVnd?: number }>>({});
+  const [loadingStock, setLoadingStock] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    setLoadingStock(true);
+    apiRequest<Record<string, { available: number; nearestExpiry: string | null; estimatedUnitCostVnd?: number }>>("inventory/availability")
+      .then((data) => {
+        if (active && data && typeof data === "object") {
+          setStockAvailability(data);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (active) setLoadingStock(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const [cart, setCart] = useState<Record<string, number>>({
     "CBST-300": 0,
     "CBST-400": 0,
@@ -3274,17 +3461,27 @@ export function InternalOrderCreator({
     0,
   );
 
+  const totalAvailableStock = Object.values(stockAvailability).reduce(
+    (sum, item) => sum + (item?.available ?? 0),
+    0,
+  );
+
+  const commissionRate = actor.role === "MEMBER" ? ((actor.commissionRateBps ?? 4000) / 10000) : 0.4;
+  const commissionRatePercent = Math.round(commissionRate * 100);
+
   const updateQty = (sku: string, delta: number) => {
+    const maxStock = stockAvailability[sku]?.available !== undefined ? stockAvailability[sku].available : 100;
     setCart((prev) => {
       const current = prev[sku] ?? 0;
-      const next = Math.max(0, Math.min(100, current + delta));
+      const next = Math.max(0, Math.min(maxStock, current + delta));
       return { ...prev, [sku]: next };
     });
   };
 
   const handleQtyInput = (sku: string, val: string) => {
+    const maxStock = stockAvailability[sku]?.available !== undefined ? stockAvailability[sku].available : 100;
     const num = parseInt(val, 10);
-    const valid = isNaN(num) ? 0 : Math.max(0, Math.min(100, num));
+    const valid = isNaN(num) ? 0 : Math.max(0, Math.min(maxStock, num));
     setCart((prev) => ({ ...prev, [sku]: valid }));
   };
 
@@ -3293,6 +3490,16 @@ export function InternalOrderCreator({
   const subtotalToDisplay = pricing?.quote.merchandiseSubtotalVnd ?? totalAmount;
   const discountToDisplay = pricing?.quote.discountVnd ?? 0;
   const totalToDisplay = pricing?.quote.totalVnd ?? totalAmount;
+
+  const totalCost = availableProducts.reduce((sum, p) => {
+    const qty = cart[p.sku] ?? 0;
+    const cost = stockAvailability[p.sku]?.estimatedUnitCostVnd || SKU_BASE_COST[p.sku] || 0;
+    return sum + cost * qty;
+  }, 0);
+  const estimatedProfitVnd = Math.max(0, totalToDisplay - totalCost);
+  const estimatedCommissionVnd = actor.role === "MEMBER" && estimatedProfitVnd > 0
+    ? Math.round(estimatedProfitVnd * commissionRate)
+    : 0;
 
   const handleCheckQuote = async () => {
     if (totalItems === 0) return;
@@ -3373,9 +3580,6 @@ export function InternalOrderCreator({
         const signature = unresolved.current?.signature ?? "";
         unresolved.current = null;
         setPricing(err.quote ? { quote: err.quote, signature, confirmed: false, stale: true } : null);
-      }
-      if (err instanceof Error && err.message === "CHECKOUT_RECONCILIATION_REQUIRED") {
-        unresolved.current = null;
       }
       setError(err);
     } finally {
@@ -3493,26 +3697,7 @@ export function InternalOrderCreator({
 
       <ErrorNotice error={error} lang={lang} />
       {error instanceof Error && error.message === "CHECKOUT_RECONCILIATION_REQUIRED" && (
-        <div style={{ marginBottom: 16 }}>
-          <button
-            type="button"
-            className="button secondary"
-            style={{ fontSize: "0.85rem", padding: "6px 14px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}
-            onClick={() => {
-              try {
-                window.sessionStorage.removeItem("cbst-checkout-retry");
-                window.sessionStorage.removeItem("cbst-internal-checkout-retry");
-              } catch {
-                /* ignore */
-              }
-              unresolved.current = null;
-              setError(null);
-            }}
-          >
-            <RotateCcw size={14} />
-            <span>{text(lang, "↺ Bỏ qua phiên dở dang và bắt đầu gửi lại đơn này", "↺ Discard pending session and retry new order")}</span>
-          </button>
-        </div>
+        <p role="alert">{text(lang, "Chưa rõ kết quả đơn trước. Giữ nguyên dữ liệu để thử lại cùng yêu cầu; nếu không thể, cần đối soát trước khi tạo đơn mới.", "Previous outcome is unresolved. Retry the identical request, or reconcile before creating another order.")}</p>
       )}
 
       <form onSubmit={handleSubmit}>
@@ -3564,6 +3749,39 @@ export function InternalOrderCreator({
             </div>
           )}
         </div>
+
+        {/* Sales & Logistics Quick Guide Banner for Members */}
+        <div className="cbst-stock-guide-banner">
+          <div className="cbst-guide-pill">
+            <Boxes size={18} color="#D84012" />
+            <span>
+              {text(lang, "Tồn kho khả dụng:", "Available stock:")}{" "}
+              <strong>
+                {loadingStock
+                  ? text(lang, "Đang kiểm kho...", "Checking...")
+                  : `${totalAvailableStock} ${text(lang, "hũ sẵn sàng giao", "jars ready")}`}
+              </strong>
+            </span>
+          </div>
+          <div className="cbst-guide-pill">
+            <Truck size={18} color="#D84012" />
+            <span>
+              {text(
+                lang,
+                "Giao hàng: HCM & Quảng Ngãi 1-2 ngày | Tỉnh khác 2-3 ngày | Freeship theo combo",
+                "Shipping: HCM/Quang Ngai 1-2 days | Other provinces 2-3 days",
+              )}
+            </span>
+          </div>
+          <div className="cbst-guide-pill">
+            <BadgePercent size={18} color="#D84012" />
+            <span>
+              {text(lang, "Mức hoa hồng của bạn:", "Your commission rate:")}{" "}
+              <strong>{commissionRatePercent}% {text(lang, "trên lợi nhuận", "on profit")}</strong>
+            </span>
+          </div>
+        </div>
+
         <div className="internal-order-grid">
           {/* Left Column: Products & Customer Details */}
           <div>
@@ -3576,19 +3794,61 @@ export function InternalOrderCreator({
               <div className="product-picker-list">
                 {availableProducts.map((p) => {
                   const qty = cart[p.sku] ?? 0;
+                  const stock = stockAvailability[p.sku];
+                  const available = stock?.available;
+                  const isOutOfStock = available !== undefined && available <= 0;
+                  const isLowStock = available !== undefined && available > 0 && available < 10;
+                  const cost = stock?.estimatedUnitCostVnd || SKU_BASE_COST[p.sku] || 0;
+                  const unitProfit = Math.max(0, p.retailPriceVnd - cost);
+                  const perJarCommission = Math.round(unitProfit * commissionRate);
+
                   return (
                     <div
                       key={p.sku}
                       className={`product-picker-item ${qty > 0 ? "active" : ""}`}
+                      style={isOutOfStock ? { opacity: 0.65 } : undefined}
                     >
-                      <div className="product-picker-info">
-                        <span className="product-picker-name">{productName(p, lang)}</span>
-                        <span className="product-picker-meta">
-                          {p.sku} · {p.netWeightG}g
-                        </span>
-                        <span className="product-picker-price">
-                          {money(p.retailPriceVnd, lang)}
-                        </span>
+                      <div className="product-picker-info" style={{ flex: 1 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 3 }}>
+                          <span className="product-picker-name">{productName(p, lang)}</span>
+                          {available !== undefined ? (
+                            isOutOfStock ? (
+                              <span className="cbst-stock-badge out-of-stock">
+                                {text(lang, "Hết hàng (0 hũ)", "Out of stock (0)")}
+                              </span>
+                            ) : isLowStock ? (
+                              <span className="cbst-stock-badge low-stock">
+                                {text(lang, `Sắp hết: còn ${available} hũ`, `Low stock: ${available} left`)}
+                              </span>
+                            ) : (
+                              <span className="cbst-stock-badge in-stock">
+                                {text(lang, `Còn ${available} hũ`, `${available} in stock`)}
+                              </span>
+                            )
+                          ) : loadingStock ? (
+                            <span style={{ fontSize: "0.72rem", color: "#9CA3AF" }}>
+                              {text(lang, "Đang kiểm kho…", "Checking stock…")}
+                            </span>
+                          ) : null}
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                          <span className="product-picker-meta">
+                            {p.sku} · {p.netWeightG}g
+                          </span>
+                          {stock?.nearestExpiry && (
+                            <span style={{ fontSize: "0.74rem", color: "#6B7280", background: "#F3F4F6", padding: "1px 6px", borderRadius: 4 }}>
+                              {text(lang, `HSD: ${stock.nearestExpiry}`, `Exp: ${stock.nearestExpiry}`)}
+                            </span>
+                          )}
+                          <span className="product-picker-price">
+                            {money(p.retailPriceVnd, lang)}
+                          </span>
+                          {actor.role === "MEMBER" && (
+                            <span style={{ fontSize: "0.78rem", color: "#059669", fontWeight: 600 }}>
+                              {text(lang, `+${money(perJarCommission, lang)} hoa hồng/hũ`, `+${money(perJarCommission, lang)} comm/jar`)}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div className="stepper-control">
                         <button
@@ -3605,15 +3865,17 @@ export function InternalOrderCreator({
                           className="stepper-input"
                           value={qty}
                           min={0}
-                          max={100}
+                          max={available !== undefined ? available : 100}
+                          disabled={isOutOfStock}
                           onChange={(e) => handleQtyInput(p.sku, e.target.value)}
                         />
                         <button
                           type="button"
                           className="stepper-btn"
-                          disabled={qty >= 100}
+                          disabled={isOutOfStock || (available !== undefined && qty >= available) || qty >= 100}
                           onClick={() => updateQty(p.sku, 1)}
                           aria-label="Increase"
+                          title={isOutOfStock ? text(lang, "Tạm hết hàng", "Out of stock") : undefined}
                         >
                           +
                         </button>
@@ -3758,11 +4020,31 @@ export function InternalOrderCreator({
                   <span>{text(lang, "Thu hộ COD", "Total COD")}</span>
                   <span style={{ color: "#D84012" }}>{money(totalToDisplay, lang)}</span>
                 </div>
-                <div className="summary-row commission-estimate">
-                  <span>{text(lang, "Hoa hồng dự kiến", "Est. Commission")}</span>
-                  <span>{money(Math.round(totalToDisplay * 0.1), lang)}</span>
                 </div>
-              </div>
+
+                {actor.role === "MEMBER" && (
+                  <div className="cbst-commission-card">
+                    <div className="cbst-commission-card-top">
+                      <div className="cbst-commission-card-title">
+                        <Sparkles size={14} color="#059669" />
+                        {text(lang, "Hoa hồng dự kiến của bạn", "Your Estimated Commission")}
+                      </div>
+                      <span style={{ fontSize: "0.76rem", fontWeight: 700, color: "#047857", background: "#FFFFFF", padding: "2px 8px", borderRadius: 9999, border: "1px solid #A7F3D0" }}>
+                        {commissionRatePercent}%
+                      </span>
+                    </div>
+                    <div className="cbst-commission-card-val">
+                      {money(estimatedCommissionVnd, lang)}
+                    </div>
+                    <div className="cbst-commission-card-sub">
+                      {text(
+                        lang,
+                        `Tính ${commissionRatePercent}% trên lợi nhuận dự kiến (${money(estimatedProfitVnd, lang)}). Ghi nhận tự động khi giao thành công.`,
+                        `${commissionRatePercent}% on estimated profit (${money(estimatedProfitVnd, lang)}). Credited upon delivery.`,
+                      )}
+                    </div>
+                  </div>
+                )}
 
               <button
                 type="submit"
@@ -3968,7 +4250,8 @@ export function MemberLeaderboardWidget({
 }) {
   const [recalculating, setRecalculating] = useState(false);
   const [commissionError, setCommissionError] = useState<unknown>(null);
-  const mutation = useRef(createMutation());
+  const actorMutation = useActorMutation();
+  const mutation = useRef(actorMutation);
   const recalculate = async () => {
     if (recalculating) return;
     setRecalculating(true);
@@ -5241,6 +5524,82 @@ function OrdersTable({
   onSelect: (order: RecordRow) => void;
   onCreateNew: () => void;
 }) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [memberFilter, setMemberFilter] = useState("ALL");
+  const [skuFilter, setSkuFilter] = useState("ALL");
+  const [sortBy, setSortBy] = useState("NEWEST");
+
+  const filteredOrders = useMemo(() => {
+    return orders
+      .filter((o) => {
+        if (searchQuery.trim()) {
+          const q = searchQuery.trim().toLowerCase();
+          const code = String(o.orderCode ?? o.id ?? "").toLowerCase();
+          const customer = (o.customer as { name?: string; phone?: string; area?: string }) ?? {};
+          const name = String(customer.name ?? "").toLowerCase();
+          const phone = String(customer.phone ?? "").toLowerCase();
+          const area = String(customer.area ?? "").toLowerCase();
+          if (!code.includes(q) && !name.includes(q) && !phone.includes(q) && !area.includes(q)) {
+            return false;
+          }
+        }
+        if (statusFilter !== "ALL") {
+          if (String(o.status ?? "PENDING") !== statusFilter) {
+            return false;
+          }
+        }
+        if (owner && memberFilter !== "ALL") {
+          if (memberFilter === "DIRECT") {
+            if (o.responsibleMemberId) return false;
+          } else {
+            if (String(o.responsibleMemberId) !== memberFilter) return false;
+          }
+        }
+        if (skuFilter !== "ALL") {
+          const items = (o.items as Array<{ sku?: string; qty?: number }>) ?? [];
+          const cleanTarget = skuFilter.replace("CBST-", "");
+          const hasSku = items.some((it) => {
+            const cleanSku = String(it.sku ?? "").replace("CBST-", "");
+            return cleanSku === cleanTarget;
+          });
+          if (!hasSku) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        if (sortBy === "NEWEST") {
+          return new Date(String(b.createdAt ?? 0)).getTime() - new Date(String(a.createdAt ?? 0)).getTime();
+        }
+        if (sortBy === "OLDEST") {
+          return new Date(String(a.createdAt ?? 0)).getTime() - new Date(String(b.createdAt ?? 0)).getTime();
+        }
+        if (sortBy === "TOTAL_DESC") {
+          return Number(b.totalVnd ?? 0) - Number(a.totalVnd ?? 0);
+        }
+        if (sortBy === "TOTAL_ASC") {
+          return Number(a.totalVnd ?? 0) - Number(b.totalVnd ?? 0);
+        }
+        return 0;
+      });
+  }, [orders, searchQuery, statusFilter, memberFilter, skuFilter, sortBy, owner]);
+
+  const hasActiveFilters = Boolean(
+    searchQuery.trim() ||
+    statusFilter !== "ALL" ||
+    (owner && memberFilter !== "ALL") ||
+    skuFilter !== "ALL" ||
+    sortBy !== "NEWEST"
+  );
+
+  const resetFilters = () => {
+    setSearchQuery("");
+    setStatusFilter("ALL");
+    setMemberFilter("ALL");
+    setSkuFilter("ALL");
+    setSortBy("NEWEST");
+  };
+
   if (!orders.length) {
     return (
       <div style={{ textAlign: "center", padding: "48px 20px", background: "#FAF8F5", borderRadius: 12, border: "1px dashed #D6D3D1", margin: "16px 0" }}>
@@ -5271,6 +5630,48 @@ function OrdersTable({
     return user ? (user.displayName || user.emailNormalized) : memberId;
   };
 
+  const getSkuBadgeMeta = (rawSku?: string) => {
+    const clean = String(rawSku ?? "").replace("CBST-", "").trim();
+    if (clean === "300") {
+      return {
+        label: "300g",
+        bg: "#FEF3C7",
+        border: "#FDE68A",
+        text: "#92400E",
+        qtyColor: "#B45309",
+        desc: text(lang, "Hũ nhỏ 300g", "Small 300g"),
+      };
+    }
+    if (clean === "400") {
+      return {
+        label: "400g",
+        bg: "#ECFDF5",
+        border: "#A7F3D0",
+        text: "#065F46",
+        qtyColor: "#047857",
+        desc: text(lang, "Hũ vừa 400g", "Medium 400g"),
+      };
+    }
+    if (clean === "600") {
+      return {
+        label: "600g",
+        bg: "#EDE9FE",
+        border: "#DDD6FE",
+        text: "#5B21B6",
+        qtyColor: "#6D28D9",
+        desc: text(lang, "Hũ lớn 600g", "Large 600g"),
+      };
+    }
+    return {
+      label: clean ? `${clean}g` : "—",
+      bg: "#F3F4F6",
+      border: "#E5E7EB",
+      text: "#374151",
+      qtyColor: "#1F2937",
+      desc: clean || "—",
+    };
+  };
+
   const statusColors: Record<string, { bg: string; color: string; border: string }> = {
     PENDING: { bg: "#FEF3C7", color: "#92400E", border: "#FDE68A" },
     CONFIRMED: { bg: "#DBEAFE", color: "#1E40AF", border: "#BFDBFE" },
@@ -5283,82 +5684,288 @@ function OrdersTable({
   };
 
   return (
-    <div className="table-scroll" tabIndex={0} role="region" aria-label={text(lang, "Danh sách đơn hàng", "Orders list")}>
-      <table>
-        <thead>
-          <tr>
-            <th scope="col">{text(lang, "Mã đơn hàng", "Order code")}</th>
-            <th scope="col">{text(lang, "Khách hàng", "Customer")}</th>
-            <th scope="col">{text(lang, "Sản phẩm", "Items")}</th>
-            <th scope="col">{text(lang, "Tổng tiền COD", "Total COD")}</th>
-            <th scope="col">{text(lang, "Trạng thái", "Status")}</th>
-            {owner ? (
-              <th scope="col">{text(lang, "Người phụ trách", "Responsible member")}</th>
-            ) : (
-              <th scope="col">{text(lang, "Hoa hồng", "Commission")}</th>
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {/* Filter & Search Bar */}
+      <div className="orders-filter-bar">
+        <div className="orders-filter-group">
+          {/* Search Box */}
+          <div className="orders-search-wrap" style={{ flex: "1 1 220px", maxWidth: 320 }}>
+            <Search
+              size={16}
+              style={{
+                position: "absolute",
+                left: 12,
+                top: "50%",
+                transform: "translateY(-50%)",
+                color: "#9CA3AF",
+                pointerEvents: "none",
+              }}
+            />
+            <input
+              type="text"
+              placeholder={text(lang, "Tìm mã đơn, tên khách, SĐT, khu vực...", "Search order, customer, phone...")}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                style={{
+                  position: "absolute",
+                  right: 8,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "#9CA3AF",
+                  padding: 4,
+                  display: "flex",
+                  alignItems: "center",
+                }}
+                aria-label="Xóa tìm kiếm"
+              >
+                <X size={14} />
+              </button>
             )}
-            <th scope="col">{text(lang, "Ngày tạo", "Date")}</th>
-            <th scope="col">{text(lang, "Thao tác", "Action")}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {orders.map((o) => {
-            const customer = (o.customer as { name?: string; phone?: string; area?: string }) ?? {};
-            const items = (o.items as Array<{ sku?: string; qty?: number }>) ?? [];
-            const st = String(o.status ?? "PENDING");
-            const style = statusColors[st] ?? { bg: "#F3F4F6", color: "#374151", border: "#E5E7EB" };
-            return (
-              <tr key={String(o.id ?? o.orderCode)}>
-                <td>
-                  <span className="mono-badge">{String(o.orderCode ?? o.id)}</span>
-                </td>
-                <td>
-                  <div style={{ fontWeight: 600, color: "#1F2937" }}>{customer.name || "—"}</div>
-                  <div style={{ fontSize: "0.8rem", color: "#6B7280" }}>{customer.phone} {customer.area ? `· ${customer.area}` : ""}</div>
-                </td>
-                <td>
-                  <span style={{ fontSize: "0.85rem", color: "#374151" }}>
-                    {items.length > 0 ? items.map((i) => `${i.qty ?? 1}x ${String(i.sku ?? "").replace("CBST-", "")}g`).join(", ") : "—"}
-                  </span>
-                </td>
-                <td>
-                  <span style={{ fontWeight: 700, color: "#D84012" }}>{money(Number(o.totalVnd ?? 0), lang)}</span>
-                </td>
-                <td>
-                  <span style={{ display: "inline-block", padding: "3px 9px", borderRadius: 9999, fontSize: "0.78rem", fontWeight: 700, background: style.bg, color: style.color, border: `1px solid ${style.border}` }}>
-                    {label(st, lang)}
-                  </span>
-                </td>
+          </div>
+
+          {/* Status Filter */}
+          <select
+            className={`cbst-order-filter-select ${statusFilter !== "ALL" ? "active" : ""}`}
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            style={{ width: "auto", flex: "0 0 auto" }}
+          >
+            <option value="ALL">{text(lang, "Tất cả trạng thái", "All Statuses")}</option>
+            <option value="PENDING">{text(lang, "⏳ Chờ xử lý", "Pending")}</option>
+            <option value="CONFIRMED">{text(lang, "✓ Đã xác nhận", "Confirmed")}</option>
+            <option value="PACKING">{text(lang, "📦 Đang đóng gói", "Packing")}</option>
+            <option value="SHIPPING">{text(lang, "🚚 Đang giao hàng", "Shipping")}</option>
+            <option value="DELIVERED">{text(lang, "✅ Đã giao thành công", "Delivered")}</option>
+            <option value="RETURN_REQUESTED">{text(lang, "⚠️ Yêu cầu hoàn", "Return Requested")}</option>
+            <option value="RETURNED">{text(lang, "↩️ Đã hoàn trả", "Returned")}</option>
+            <option value="CANCELLED">{text(lang, "❌ Đã hủy", "Cancelled")}</option>
+          </select>
+
+          {/* Responsible Member Filter (Owner only) */}
+          {owner && (
+            <select
+              className={`cbst-order-filter-select ${memberFilter !== "ALL" ? "active-blue" : ""}`}
+              value={memberFilter}
+              onChange={(e) => setMemberFilter(e.target.value)}
+              style={{ width: "auto", flex: "0 0 auto" }}
+            >
+              <option value="ALL">{text(lang, "Tất cả người phụ trách", "All Assignees")}</option>
+              <option value="DIRECT">{text(lang, "Chủ cửa hàng (Trực tiếp)", "Owner (Direct)")}</option>
+              {allUsers.filter((u) => u.role === "MEMBER").map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.displayName || u.emailNormalized}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {/* SKU / Product Filter */}
+          <select
+            className={`cbst-order-filter-select ${skuFilter !== "ALL" ? "active-amber" : ""}`}
+            value={skuFilter}
+            onChange={(e) => setSkuFilter(e.target.value)}
+            style={{ width: "auto", flex: "0 0 auto" }}
+          >
+            <option value="ALL">{text(lang, "Tất cả sản phẩm", "All Products")}</option>
+            <option value="CBST-300">{text(lang, "Hũ nhỏ 300g", "Small 300g Jar")}</option>
+            <option value="CBST-400">{text(lang, "Hũ vừa 400g", "Medium 400g Jar")}</option>
+            <option value="CBST-600">{text(lang, "Hũ lớn 600g", "Large 600g Jar")}</option>
+          </select>
+
+          {/* Sort By */}
+          <select
+            className="cbst-order-filter-select"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            style={{ width: "auto", flex: "0 0 auto" }}
+          >
+            <option value="NEWEST">{text(lang, "Mới nhất trước", "Newest first")}</option>
+            <option value="OLDEST">{text(lang, "Cũ nhất trước", "Oldest first")}</option>
+            <option value="TOTAL_DESC">{text(lang, "COD cao → thấp", "COD: High → Low")}</option>
+            <option value="TOTAL_ASC">{text(lang, "COD thấp → cao", "COD: Low → High")}</option>
+          </select>
+        </div>
+
+        {/* Counter and Clear Filters button */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+          <span style={{ fontSize: "0.85rem", color: "#6B7280", fontWeight: 500 }}>
+            {text(lang, `Hiển thị ${filteredOrders.length} / ${orders.length} đơn`, `Showing ${filteredOrders.length} / ${orders.length} orders`)}
+          </span>
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={resetFilters}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                background: "#F3F4F6",
+                border: "1px solid #E5E7EB",
+                borderRadius: 7,
+                padding: "6px 12px",
+                fontSize: "0.82rem",
+                color: "#4B5563",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              <RotateCcw size={13} />
+              <span>{text(lang, "Đặt lại", "Reset")}</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {filteredOrders.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "48px 20px", background: "#FAF8F5", borderRadius: 12, border: "1px dashed #D6D3D1", margin: "8px 0" }}>
+          <Search size={36} strokeWidth={1.5} color="#9CA3AF" style={{ margin: "0 auto 10px" }} />
+          <h4 style={{ fontSize: "1rem", fontWeight: 700, color: "#374151", margin: "0 0 6px" }}>
+            {text(lang, "Không tìm thấy đơn hàng phù hợp", "No matching orders found")}
+          </h4>
+          <p style={{ fontSize: "0.85rem", color: "#6B7280", margin: "0 0 14px" }}>
+            {text(lang, "Thử thay đổi từ khóa tìm kiếm hoặc đặt lại các bộ lọc.", "Try adjusting search query or resetting filters.")}
+          </p>
+          <button
+            type="button"
+            className="secondary"
+            onClick={resetFilters}
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.85rem" }}
+          >
+            <RotateCcw size={14} />
+            <span>{text(lang, "Xóa toàn bộ bộ lọc", "Clear all filters")}</span>
+          </button>
+        </div>
+      ) : (
+        <div className="table-scroll" tabIndex={0} role="region" aria-label={text(lang, "Danh sách đơn hàng", "Orders list")}>
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">{text(lang, "Mã đơn hàng", "Order code")}</th>
+                <th scope="col">{text(lang, "Khách hàng", "Customer")}</th>
+                <th scope="col">{text(lang, "Sản phẩm", "Items")}</th>
+                <th scope="col">{text(lang, "Tổng tiền COD", "Total COD")}</th>
+                <th scope="col">{text(lang, "Trạng thái", "Status")}</th>
                 {owner ? (
-                  <td>
-                    <span style={{ fontSize: "0.85rem", color: o.responsibleMemberId ? "#1E40AF" : "#6B7280", fontWeight: o.responsibleMemberId ? 600 : 400 }}>
-                      {getMemberName(o.responsibleMemberId ? String(o.responsibleMemberId) : null)}
-                    </span>
-                  </td>
+                  <th scope="col">{text(lang, "Người phụ trách", "Responsible member")}</th>
                 ) : (
-                  <td>
-                    <span style={{ fontWeight: 600, color: "#166534", fontSize: "0.85rem" }}>
-                      {money(Number(o.commissionVnd ?? 0), lang)}
-                    </span>
-                  </td>
+                  <th scope="col">{text(lang, "Hoa hồng", "Commission")}</th>
                 )}
-                <td style={{ fontSize: "0.82rem", color: "#6B7280" }}>
-                  {o.createdAt ? new Date(String(o.createdAt)).toLocaleDateString("vi-VN") : "—"}
-                </td>
-                <td>
-                  <button
-                    type="button"
-                    className="secondary"
-                    onClick={() => onSelect(o)}
-                  >
-                    {text(lang, "Mở đơn", "Open")}
-                  </button>
-                </td>
+                <th scope="col">{text(lang, "Ngày tạo", "Date")}</th>
+                <th scope="col">{text(lang, "Thao tác", "Action")}</th>
               </tr>
-            );
-          })}
-        </tbody>
-      </table>
+            </thead>
+            <tbody>
+              {filteredOrders.map((o) => {
+                const customer = (o.customer as { name?: string; phone?: string; area?: string }) ?? {};
+                const items = (o.items as Array<{ sku?: string; qty?: number }>) ?? [];
+                const totalJars = items.reduce((sum, i) => sum + Number(i.qty ?? 1), 0);
+                const st = String(o.status ?? "PENDING");
+                const style = statusColors[st] ?? { bg: "#F3F4F6", color: "#374151", border: "#E5E7EB" };
+                return (
+                  <tr key={String(o.id ?? o.orderCode)}>
+                    <td>
+                      <span className="mono-badge">{String(o.orderCode ?? o.id)}</span>
+                    </td>
+                    <td>
+                      <div style={{ fontWeight: 600, color: "#1F2937" }}>{customer.name || "—"}</div>
+                      <div style={{ fontSize: "0.8rem", color: "#6B7280" }}>{customer.phone} {customer.area ? `· ${customer.area}` : ""}</div>
+                    </td>
+                    <td>
+                      {items.length === 0 ? (
+                        <span style={{ color: "#9CA3AF" }}>—</span>
+                      ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 140 }}>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 5, alignItems: "center" }}>
+                            {items.map((i, idx) => {
+                              const meta = getSkuBadgeMeta(i.sku);
+                              const qty = Number(i.qty ?? 1);
+                              return (
+                                <span
+                                  key={idx}
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 4,
+                                    padding: "2px 8px",
+                                    borderRadius: 6,
+                                    background: meta.bg,
+                                    border: `1px solid ${meta.border}`,
+                                    fontSize: "0.8rem",
+                                    lineHeight: "1.25rem",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                  title={`${qty} × ${meta.desc}`}
+                                >
+                                  <strong
+                                    style={{
+                                      fontWeight: 800,
+                                      color: meta.qtyColor,
+                                      fontSize: "0.84rem",
+                                    }}
+                                  >
+                                    {qty}×
+                                  </strong>
+                                  <span style={{ fontWeight: 600, color: meta.text }}>{meta.label}</span>
+                                </span>
+                              );
+                            })}
+                          </div>
+                          {items.length > 1 && (
+                            <span style={{ fontSize: "0.74rem", color: "#6B7280", fontWeight: 600 }}>
+                              {text(lang, `Tổng: ${totalJars} hũ`, `Total: ${totalJars} jars`)}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      <span style={{ fontWeight: 700, color: "#D84012" }}>{money(Number(o.totalVnd ?? 0), lang)}</span>
+                    </td>
+                    <td>
+                      <span style={{ display: "inline-block", padding: "3px 9px", borderRadius: 9999, fontSize: "0.78rem", fontWeight: 700, background: style.bg, color: style.color, border: `1px solid ${style.border}` }}>
+                        {label(st, lang)}
+                      </span>
+                    </td>
+                    {owner ? (
+                      <td>
+                        <span style={{ fontSize: "0.85rem", color: o.responsibleMemberId ? "#1E40AF" : "#6B7280", fontWeight: o.responsibleMemberId ? 600 : 400 }}>
+                          {getMemberName(o.responsibleMemberId ? String(o.responsibleMemberId) : null)}
+                        </span>
+                      </td>
+                    ) : (
+                      <td>
+                        <span style={{ fontWeight: 600, color: "#166534", fontSize: "0.85rem" }}>
+                          {money(Number(o.commissionVnd ?? 0), lang)}
+                        </span>
+                      </td>
+                    )}
+                    <td style={{ fontSize: "0.82rem", color: "#6B7280" }}>
+                      {o.createdAt ? new Date(String(o.createdAt)).toLocaleDateString("vi-VN") : "—"}
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="secondary"
+                        onClick={() => onSelect(o)}
+                      >
+                        {text(lang, "Mở đơn", "Open")}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -6081,6 +6688,14 @@ function AdminInner({
                         </div>
                       </div>
 
+                      {/* Live Warehouse Stock & Commission Reference for Member */}
+                      <MemberInventoryWidget
+                        products={products}
+                        actor={actor}
+                        lang={lang}
+                        onGoToCreate={() => setSection("create-order")}
+                      />
+
                       {/* Middle Row: Member Charts */}
                       <div className="apex-charts-grid-2-1">
                         <SalesOverviewChart
@@ -6360,11 +6975,11 @@ export function Admin(props: {
   if (!existingClient) {
     return (
       <QueryClientProvider client={getSharedQueryClient()}>
-        <AdminInner {...props} />
+        <OperationActorContext.Provider key={props.actor.id} value={props.actor.id}><AdminInner {...props} /></OperationActorContext.Provider>
       </QueryClientProvider>
     );
   }
-  return <AdminInner {...props} />;
+  return <OperationActorContext.Provider key={props.actor.id} value={props.actor.id}><AdminInner {...props} /></OperationActorContext.Provider>;
 }
 
 export const STORE_NAV_ITEMS = [

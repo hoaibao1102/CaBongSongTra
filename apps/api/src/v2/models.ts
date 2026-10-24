@@ -12,7 +12,7 @@ export interface Order {
   allocations: Array<{ batchId: string; sku: string; qty: number; landedUnitCostVnd: number; returnedQty?: number }>;
   returnValueVnd?: number; returnRefundsVnd?: number;
   totalVnd: number; receiptsVnd: number; refundsVnd: number; cogsVnd: number; directCostsVnd: number;
-  costsFinalized: boolean; commissionRateBps: number; commissionVnd: number; shippedAt?: Date; deliveredAt?: Date; createdAt: Date;
+  costsFinalized: boolean; commissionRateBps: number; commissionVnd: number; shippedAt?: Date; shippedCancellationAt?: Date; deliveredAt?: Date; createdAt: Date;
 }
 export interface Batch { id: string; sku: string; lotCode: string; receivedAt: Date; expiresAt?: Date; labelReference?: string; onHand: number; reserved: number; landedUnitCostVnd: number; status: "AVAILABLE" | "QUARANTINED"; receiptId?: string; receiptCode?: string; supplierLotCode?: string; purchasePriceVnd?: number; allocatedShippingVnd?: number; }
 export interface PurchaseReceiptItem {
@@ -80,7 +80,7 @@ const allocationSchema = new Schema({ batchId: { type: String, required: true },
 const customerSchema = new Schema({ name: { type: String, required: true }, phone: { type: String, required: true }, address: { type: String, required: true }, area: { type: String, required: true } }, { _id: false, strict: "throw" });
 export const orderSchema = new Schema<Order>({ id, orderCode: { type: String, required: true, unique: true }, responsibleMemberId: { type: String, default: null }, status: { type: String, required: true, enum: ["PENDING", "CONFIRMED", "PACKING", "SHIPPING", "DELIVERED", "CANCELLED", "DELIVERY_FAILED", "RETURN_REQUESTED", "PARTIALLY_RETURNED", "RETURNED"] }, version: nonnegative, customer: { type: customerSchema, required: true }, consentAt: { type: Date, required: true }, source: { type: String, required: true }, notes: String, items: { type: [itemSchema], required: true }, allocations: { type: [allocationSchema], default: [] }, totalVnd: nonnegative, receiptsVnd: nonnegative, refundsVnd: nonnegative, cogsVnd: nonnegative, directCostsVnd: nonnegative, costsFinalized: { type: Boolean, required: true }, commissionRateBps: { ...nonnegative, max: 10000 }, commissionVnd: nonnegative, shippedAt: Date, deliveredAt: Date, createdAt: { type: Date, required: true } }, options);
 orderSchema.index({ responsibleMemberId: 1, createdAt: -1, id: 1 });
-orderSchema.add({ returnValueVnd: { ...nonnegative, default: 0 }, returnRefundsVnd: { ...nonnegative, default: 0 } });
+orderSchema.add({ shippedCancellationAt: Date, returnValueVnd: { ...nonnegative, default: 0 }, returnRefundsVnd: { ...nonnegative, default: 0 } });
 orderSchema.index({ status: 1, deliveredAt: -1 });
 orderSchema.add({ pricingSchemaVersion: { ...integer, required: false, enum: [1, 2] }, pricingMode: { type: String, enum: ["BASE_PRICE", "PUBLIC_PROMOTIONS", "INTERNAL_VOUCHER"] }, merchandiseSubtotalVnd: { ...nonnegative, required: false }, discountVnd: { ...nonnegative, required: false }, pricedAt: Date, voucherId: String });
 export const batchSchema = new Schema<Batch>({ id, sku: { type: String, required: true }, lotCode: { type: String, required: true }, receivedAt: { type: Date, required: true }, expiresAt: Date, labelReference: String, onHand: nonnegative, reserved: nonnegative, landedUnitCostVnd: nonnegative, status: { type: String, enum: ["AVAILABLE", "QUARANTINED"], required: true } }, options);
@@ -257,6 +257,11 @@ export interface KpiPeriod {
   status: "OPEN" | "SETTLED";
   settledAt?: Date;
   settledBy?: string;
+  settlementSnapshot?: {
+    version: 1; policy: KpiPolicy; startDate: Date; endDate: Date;
+    members: Array<{ memberId: string; displayName: string; email: string; status: string; deliveredQty: number; achievedTierQty: number | null; bonusVnd: number; ledgerEntryId?: string }>;
+    totalBonusVnd: number;
+  };
   createdAt: Date;
 }
 
@@ -304,6 +309,19 @@ export const kpiPeriodSchema = new Schema<KpiPeriod>(
     status: { type: String, required: true, enum: ["OPEN", "SETTLED"], default: "OPEN" },
     settledAt: Date,
     settledBy: String,
+    settlementSnapshot: {
+      type: new Schema({
+        version: { type: Number, required: true, enum: [1] },
+        policy: { type: kpiPolicySchema, required: true },
+        startDate: { type: Date, required: true }, endDate: { type: Date, required: true },
+        members: { type: [new Schema({
+          memberId: { type: String, required: true }, displayName: String, email: String, status: String,
+          deliveredQty: nonnegative, achievedTierQty: { type: Number, default: null }, bonusVnd: nonnegative, ledgerEntryId: String,
+        }, { _id: false, strict: "throw" })], required: true },
+        totalBonusVnd: nonnegative,
+      }, { _id: false, strict: "throw" }),
+      immutable: true, required: false,
+    },
     createdAt: { type: Date, required: true },
   },
   options,

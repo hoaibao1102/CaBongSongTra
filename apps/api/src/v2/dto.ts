@@ -108,6 +108,9 @@ export class AdjustmentDto {
   @IsInt() @Min(-100000) @Max(100000) qtyDelta!: number;
   @IsString() @MinLength(1) @MaxLength(300) reason!: string;
 }
+export class BatchStatusDto {
+  @IsIn(["AVAILABLE", "QUARANTINED"]) status!: "AVAILABLE" | "QUARANTINED";
+}
 export class ExpenseDto {
   @IsIn(["ORDER", "OVERHEAD"]) scope!: "ORDER" | "OVERHEAD";
   @IsOptional() @IsUUID() orderId?: string;
@@ -208,7 +211,7 @@ export class KpiTierDto {
 export class CreateKpiPolicyDto {
   @ApiProperty({ type: String, maxLength: 200 }) @IsString() @MinLength(1) @MaxLength(200) name!: string;
   @ApiProperty({ enum: ["MONTHLY", "WEEKLY", "CUSTOM"] }) @IsIn(["MONTHLY", "WEEKLY", "CUSTOM"]) periodType!: "MONTHLY" | "WEEKLY" | "CUSTOM";
-  @ApiPropertyOptional({ enum: ["PRODUCT_QTY", "REVENUE"] }) @IsOptional() @IsIn(["PRODUCT_QTY", "REVENUE"]) metric?: "PRODUCT_QTY" | "REVENUE";
+  @ApiPropertyOptional({ enum: ["PRODUCT_QTY"] }) @IsOptional() @IsIn(["PRODUCT_QTY"]) metric?: "PRODUCT_QTY" | "REVENUE";
   @ApiProperty({ type: [KpiTierDto] }) @IsArray() @ArrayMinSize(1) @ValidateNested({ each: true }) @Type(() => KpiTierDto) tiers!: KpiTierDto[];
   @ApiPropertyOptional({ type: Boolean }) @IsOptional() @IsBoolean() active?: boolean;
 }

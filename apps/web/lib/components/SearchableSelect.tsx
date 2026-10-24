@@ -64,7 +64,11 @@ export function SearchableSelect({
     }
   };
 
-  const handleSelect = (val: string) => {
+  const handleSelect = (val: string, e?: React.SyntheticEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     onChange(val);
     setIsOpen(false);
     setQuery("");
@@ -129,17 +133,6 @@ export function SearchableSelect({
         </div>
       </div>
 
-      {/* Hidden input for HTML form requirement */}
-      {required && (
-        <input
-          type="text"
-          value={value}
-          onChange={() => {}}
-          required
-          style={{ opacity: 0, position: "absolute", width: 1, height: 1, pointerEvents: "none" }}
-        />
-      )}
-
       {isOpen && (
         <div className="cbst-select-dropdown">
           <div className="cbst-select-search-box">
@@ -164,7 +157,8 @@ export function SearchableSelect({
                   <div
                     key={opt.value}
                     className={`cbst-select-option ${isSelected ? "selected" : ""}`}
-                    onClick={() => handleSelect(opt.value)}
+                    onMouseDown={(e) => handleSelect(opt.value, e)}
+                    onClick={(e) => handleSelect(opt.value, e)}
                   >
                     <div className="cbst-select-option-text">
                       <div className="cbst-select-option-main">

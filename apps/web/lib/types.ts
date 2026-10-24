@@ -1,6 +1,7 @@
 export type Lang = "vi" | "en";
 export type Role = "OWNER_ADMIN" | "MEMBER";
-export type Actor = { id: string; role: Role; displayName?: string };
+export type Actor = { id: string; role: Role; displayName?: string; commissionRateBps?: number };
+export type InventoryAvailability = Record<string, { available: number; nearestExpiry: string | null; estimatedUnitCostVnd?: number }>;
 export type Product = {
   sku: string;
   name: string;
