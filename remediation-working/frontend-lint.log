@@ -1,0 +1,19 @@
+
+> @cbst/web@2.0.0 lint D:\BANHANG\web\ca-bong-song-tra-nextjs-v1\ca-bong-song-tra-v1\apps\web
+> eslint . --max-warnings=0
+
+
+D:\BANHANG\web\ca-bong-song-tra-nextjs-v1\ca-bong-song-tra-v1\apps\web\lib\components\CommissionManager.tsx
+  11:3   error  'CreditCard' is defined but never used           @typescript-eslint/no-unused-vars
+  12:3   error  'History' is defined but never used              @typescript-eslint/no-unused-vars
+  14:3   error  'Award' is defined but never used                @typescript-eslint/no-unused-vars
+  19:3   error  'Sparkles' is defined but never used             @typescript-eslint/no-unused-vars
+  85:10  error  'kpiLoading' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+D:\BANHANG\web\ca-bong-song-tra-nextjs-v1\ca-bong-song-tra-v1\apps\web\lib\components\MemberCommissions.tsx
+  7:10  error  'Award' is defined but never used       @typescript-eslint/no-unused-vars
+  7:25  error  'TrendingUp' is defined but never used  @typescript-eslint/no-unused-vars
+
+✖ 7 problems (7 errors, 0 warnings)
+
+ ELIFECYCLE  Command failed with exit code 1.

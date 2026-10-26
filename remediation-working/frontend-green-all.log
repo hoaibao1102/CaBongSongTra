@@ -1,0 +1,13 @@
+
+> @cbst/web@2.0.0 test D:\BANHANG\web\ca-bong-song-tra-nextjs-v1\ca-bong-song-tra-v1\apps\web
+> vitest run
+
+
+ RUN  v4.1.11 D:/BANHANG/web/ca-bong-song-tra-nextjs-v1/ca-bong-song-tra-v1/apps/web
+
+
+ Test Files  19 passed (19)
+      Tests  178 passed (178)
+   Start at  19:54:20
+   Duration  1.29s (transform 2.71s, setup 0ms, import 5.01s, tests 836ms, environment 2ms)
+

@@ -1,0 +1,13 @@
+
+ RUN  v4.1.11 D:/BANHANG/web/ca-bong-song-tra-nextjs-v1/ca-bong-song-tra-v1/apps/api
+
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > blocks settlement while a period has not closed 3ms
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > queries delivered performance with half-open event boundaries only 1ms
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > selects active progress half-open without falling back to a future or ended period 1ms
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > rejects unsupported REVENUE at DTO and service/calculator boundaries 2ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  19:47:51
+   Duration  1.52s (transform 220ms, setup 0ms, import 1.37s, tests 7ms, environment 1ms)
+

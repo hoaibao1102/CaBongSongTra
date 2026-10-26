@@ -1,0 +1,5 @@
+{
+  "output": "> @cbst/api@2.0.0 lint D:\\BANHANG\\web\\ca-bong-song-tra-nextjs-v1\\ca-bong-song-tra-v1\\apps\\api\n> eslint src test --max-warnings=0\n\n\nD:\\BANHANG\\web\\ca-bong-song-tra-nextjs-v1\\ca-bong-song-tra-v1\\apps\\api\\test\\kpi.test.ts\n  129:24  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any\n\n\u2716 1 problem (1 error, 0 warnings)\n\n\u2009ELIFECYCLE\u2009 Command failed with exit code 1.",
+  "exit_code": 1,
+  "error": null
+}

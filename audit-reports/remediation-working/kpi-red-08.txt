@@ -1,0 +1,93 @@
+
+ RUN  v4.1.11 D:/BANHANG/web/ca-bong-song-tra-nextjs-v1/ca-bong-song-tra-v1/apps/api
+
+ × test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > accrues KPI expense once, while payout only moves cash (aggregation expression contract) 5ms
+   → expected 1000 to be 950 // Object.is equality
+ × test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > refuses a legacy REVENUE policy in member progress 3ms
+   → promise resolved "{ hasActivePeriod: true, …(8) }" instead of rejecting
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > freezes the complete settled roster, policy, zero results and window without any live reads 2ms
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > fails explicitly for legacy incomplete settled history instead of live recomputation 1ms
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > persists a positive award tied to its ledger and does not settle twice 1ms
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > blocks settlement while a period has not closed 0ms
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > queries delivered performance with half-open event boundaries only 1ms
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > selects active progress half-open without falling back to a future or ended period 0ms
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > rejects unsupported REVENUE at DTO and service/calculator boundaries 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > accrues KPI expense once, while payout only moves cash (aggregation expression contract)
+AssertionError: expected 1000 to be 950 // Object.is equality
+
+- Expected
++ Received
+
+- 950
++ 1000
+
+ ❯ test/remediation-kpi.test.ts:35:80
+     33|   expect((await service.dashboard(owner)).netProfitVnd).toBe(1000);
+     34|   rows.push({ kind: "KPI_BONUS", amountVnd: 50 });
+     35|   const accrued = await service.dashboard(owner); expect(accrued.netPr…
+       |                                                                                ^
+     36|   rows.push({ kind: "PAYOUT", amountVnd: 50 });
+     37|   expect(await service.dashboard(owner)).toMatchObject({ netProfitVnd:…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > refuses a legacy REVENUE policy in member progress
+AssertionError: promise resolved "{ hasActivePeriod: true, …(8) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "achievedTier": null,
++   "currentBonusVnd": 0,
++   "currentQty": 0,
++   "hasActivePeriod": true,
++   "nextTier": {
++     "bonusVnd": 50,
++     "minQty": 1,
++   },
++   "period": {
++     "createdAt": 1970-01-01T00:00:00.000Z,
++     "endDate": 2020-02-01T00:00:00.000Z,
++     "id": "p",
++     "name": "January",
++     "policyId": "policy",
++     "startDate": 2020-01-01T00:00:00.000Z,
++     "status": "OPEN",
++   },
++   "policy": {
++     "id": "policy",
++     "name": "P",
++     "periodType": "CUSTOM",
++     "tiers": [
++       {
++         "bonusVnd": 50,
++         "minQty": 1,
++       },
++     ],
++   },
++   "progressPercent": 0,
++   "remainingQtyToNextTier": 1,
+  }
+
+ ❯ test/remediation-kpi.test.ts:41:70
+     39|  it("refuses a legacy REVENUE policy in member progress", async () => {
+     40|   const { service, db } = setup(); db.kpiPolicies.findOne.mockImplemen…
+     41|   await expect(service.getMyKpiProgress({ id: "m", role: "MEMBER" })).…
+       |                                                                      ^
+     42|  });
+     43|  it("freezes the complete settled roster, policy, zero results and win…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 7 passed (9)
+   Start at  19:50:38
+   Duration  1.35s (transform 171ms, setup 0ms, import 1.17s, tests 16ms, environment 0ms)
+

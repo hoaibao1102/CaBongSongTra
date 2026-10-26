@@ -1,0 +1,34 @@
+
+ RUN  v4.1.11 D:/BANHANG/web/ca-bong-song-tra-nextjs-v1/ca-bong-song-tra-v1/apps/web
+
+ ❯ lib/financial-retry.test.ts (8 tests | 1 failed) 45ms
+     × fails closed for unscoped non-auth mutations 25ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  lib/financial-retry.test.ts > durable actor scoped operations > fails closed for unscoped non-auth mutations
+AssertionError: expected [Function] to throw error including 'OPERATION_ACTOR_REQUIRED' but got 'Cannot read properties of undefined (…'
+
+Expected: "OPERATION_ACTOR_REQUIRED"
+Received: "Cannot read properties of undefined (reading 'json')"
+
+ ❯ lib/financial-retry.test.ts:9:68
+      7|   it("fails closed for unscoped non-auth mutations", async () => {
+      8|     const fetcher=vi.fn();
+      9|     await expect(createMutation(fetcher)("expenses",{amountVnd:1})).re…
+       |                                                                    ^
+     10|     expect(fetcher).not.toHaveBeenCalled();
+     11|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 7 passed (8)
+   Start at  19:50:36
+   Duration  363ms (transform 48ms, setup 0ms, import 170ms, tests 45ms, environment 0ms)
+
+undefined
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command "vitest" not found
+
+Did you mean "pnpm exec vitest"?

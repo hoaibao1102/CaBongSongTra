@@ -1,0 +1,34 @@
+
+ RUN  v4.1.11 D:/BANHANG/web/ca-bong-song-tra-nextjs-v1/ca-bong-song-tra-v1/apps/web
+
+ ❯ lib/financial-retry.test.ts (1 test | 1 failed) 23ms
+     × blocks edits after a lost response across remount and reload, replays the same key without storing private payload 22ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  lib/financial-retry.test.ts > durable actor scoped operations > blocks edits after a lost response across remount and reload, replays the same key without storing private payload
+AssertionError: expected [Function] to throw error including 'OPERATION_RECONCILIATION_REQUIRED' but got 'response lost'
+
+Expected: "OPERATION_RECONCILIATION_REQUIRED"
+Received: "response lost"
+
+ ❯ lib/financial-retry.test.ts:9:89
+      7|     const options={store, actorId:"owner-a"}; const payload={amountVnd…
+      8|     await createMutation(fetcher, options)("expenses",payload).catch((…
+      9|     await expect(createMutation(fetcher,options)("expenses",{...payloa…
+       |                                                                                         ^
+     10|     await createMutation(fetcher,options)("expenses",payload).catch(()…
+     11|     expect(fetcher).toHaveBeenCalledTimes(2);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  19:47:08
+   Duration  256ms (transform 30ms, setup 0ms, import 84ms, tests 23ms, environment 0ms)
+
+undefined
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command "vitest" not found
+
+Did you mean "pnpm exec vitest"?

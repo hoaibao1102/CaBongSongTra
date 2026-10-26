@@ -1,0 +1,33 @@
+
+ RUN  v4.1.11 D:/BANHANG/web/ca-bong-song-tra-nextjs-v1/ca-bong-song-tra-v1/apps/api
+
+ ❯ test/bus03-costing.test.ts (2 tests | 1 failed) 18ms
+     × capitalizes shipping for zero-value goods by quantity with stable remainder 14ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/bus03-costing.test.ts > BUS-03 exact purchase receipt inventory cost > capitalizes shipping for zero-value goods by quantity with stable remainder
+AssertionError: expected +0 to be 7 // Object.is equality
+
+- Expected
++ Received
+
+- 7
++ 0
+
+ ❯ test/bus03-costing.test.ts:27:81
+     25|       { sku: "CBST-400", qty: 3, purchasePriceVnd: 0 },
+     26|     ], 7);
+     27|     expect(batches.reduce((sum, b) => sum + b.onHand * b.landedUnitCos…
+       |                                                                                 ^
+     28|     expect(receipt.items.filter(i => i.sku === "CBST-300").reduce((sum…
+     29|     expect(receipt.items.filter(i => i.sku === "CBST-400").reduce((sum…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  19:47:37
+   Duration  1.15s (transform 149ms, setup 0ms, import 976ms, tests 18ms, environment 0ms)
+

@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 D:/BANHANG/web/ca-bong-song-tra-nextjs-v1/ca-bong-song-tra-v1/apps/api
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  19:47:19
+   Duration  1.00s (transform 101ms, setup 0ms, import 850ms, tests 4ms, environment 0ms)
+

@@ -1,0 +1,7 @@
+{
+  "command": "pnpm exec vitest run --maxWorkers=1",
+  "network_guard": true,
+  "output": "RUN  v4.1.11 D:/BANHANG/web/ca-bong-song-tra-nextjs-v1/ca-bong-song-tra-v1/apps/web\n\n\n Test Files  21 passed (21)\n      Tests  184 passed (184)\n   Start at  20:22:26\n   Duration  7.63s (transform 865ms, setup 0ms, import 3.16s, tests 634ms, environment 1ms)",
+  "exit_code": 0,
+  "error": null
+}

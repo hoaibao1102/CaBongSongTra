@@ -1,0 +1,51 @@
+
+ RUN  v4.1.11 D:/BANHANG/web/ca-bong-song-tra-nextjs-v1/ca-bong-song-tra-v1/apps/web
+
+ ❯ lib/financial-retry.test.ts (10 tests | 2 failed) 83ms
+     × explains recovery for unresolved financial operations 5ms
+     × rejects corrupt checkout null state instead of replacing it 58ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  lib/financial-retry.test.ts > durable actor scoped operations > explains recovery for unresolved financial operations
+AssertionError: expected 'The request could not be completed. R…' to contain 'original'
+
+Expected: "original"
+Received: "The request could not be completed. Review the values or retry. (OPERATION_RECONCILIATION_REQUIRED)"
+
+ ❯ lib/financial-retry.test.ts:9:76
+      7| describe("durable actor scoped operations", () => {
+      8|   it("explains recovery for unresolved financial operations", () => {
+      9|     expect(errorText(new Error("OPERATION_RECONCILIATION_REQUIRED"),"e…
+       |                                                                            ^
+     10|     expect(errorText(new Error("OPERATION_RECONCILIATION_REQUIRED"),"e…
+     11|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  lib/financial-retry.test.ts > durable actor scoped operations > rejects corrupt checkout null state instead of replacing it
+AssertionError: expected [Function] to throw error including 'RETRY_STORAGE_UNAVAILABLE' but got 'Cannot read properties of undefined (…'
+
+Expected: "RETRY_STORAGE_UNAVAILABLE"
+Received: "Cannot read properties of undefined (reading 'json')"
+
+ ❯ lib/financial-retry.test.ts:14:57
+     12|   it("rejects corrupt checkout null state instead of replacing it", as…
+     13|     const store=storage();store.setItem("cbst-checkout-retry","null");…
+     14|     await expect(createCheckout(store,fetcher)({qty:1})).rejects.toThr…
+       |                                                         ^
+     15|     expect(fetcher).not.toHaveBeenCalled();
+     16|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 8 passed (10)
+   Start at  19:52:21
+   Duration  600ms (transform 105ms, setup 0ms, import 301ms, tests 83ms, environment 0ms)
+
+undefined
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command "vitest" not found
+
+Did you mean "pnpm exec vitest"?

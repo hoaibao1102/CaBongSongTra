@@ -1,0 +1,6 @@
+{
+  "command": "pnpm lint",
+  "output": "> ca-bong-song-tra-v2@2.0.0 lint D:\\BANHANG\\web\\ca-bong-song-tra-nextjs-v1\\ca-bong-song-tra-v1\n> pnpm -r lint\n\nScope: 2 of 3 workspace projects\napps/api lint$ eslint src test --max-warnings=0\napps/web lint$ eslint . --max-warnings=0\napps/api lint: D:\\BANHANG\\web\\ca-bong-song-tra-nextjs-v1\\ca-bong-song-tra-v1\\apps\\api\\src\\v2\\service.ts\napps/api lint:    10:116  error  'KpiTier' is defined but never used  @typescript-eslint/no-unused-vars\napps/api lint:   680:24   error  'actor' is defined but never used    @typescript-eslint/no-unused-vars\napps/api lint:   704:23   error  'actor' is defined but never used    @typescript-eslint/no-unused-vars\napps/api lint: D:\\BANHANG\\web\\ca-bong-song-tra-nextjs-v1\\ca-bong-song-tra-v1\\apps\\api\\test\\kpi.test.ts\napps/api lint:   128:24  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any\napps/api lint: ✖ 4 problems (4 errors, 0 warnings)\napps/api lint: Failed\nD:\\BANHANG\\web\\ca-bong-song-tra-nextjs-v1\\ca-bong-song-tra-v1\\apps\\api:\r\n ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @cbst/api@2.0.0 lint: `eslint src test --max-warnings=0`\nExit status 1\n ELIFECYCLE  Command failed with exit code 1.",
+  "exit_code": 1,
+  "error": null
+}

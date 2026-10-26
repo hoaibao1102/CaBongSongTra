@@ -1,0 +1,33 @@
+
+ RUN  v4.1.11 D:/BANHANG/web/ca-bong-song-tra-nextjs-v1/ca-bong-song-tra-v1/apps/api
+
+ × test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > rejects unsupported REVENUE at DTO and service/calculator boundaries 6ms
+   → expected false to be true // Object.is equality
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > rejects unsupported REVENUE at DTO and service/calculator boundaries
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/remediation-kpi.test.ts:19:68
+     17|   const { service, db } = setup();
+     18|   const dto = Object.assign(new CreateKpiPolicyDto(), { name: "P", per…
+     19|   expect((await validate(dto)).some(e => e.property === "metric")).toB…
+       |                                                                    ^
+     20|   await expect(service.createKpiPolicy(owner, dto, "k", "r")).rejects.…
+     21|   expect(() => service.evaluateKpi({ ...policy, metric: "REVENUE" } as…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  19:46:24
+   Duration  1.23s (transform 126ms, setup 0ms, import 1.07s, tests 7ms, environment 0ms)
+

@@ -1,0 +1,38 @@
+
+ RUN  v4.1.11 D:/BANHANG/web/ca-bong-song-tra-nextjs-v1/ca-bong-song-tra-v1/apps/web
+
+ ❯ lib/review-r2-concurrent-retry.test.ts (2 tests | 2 failed) 30ms
+     × keeps the fence when an earlier 400 resolves while an identical replay is pending 27ms
+     × keeps the fence when an earlier 401 resolves while an identical replay is pending 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  lib/review-r2-concurrent-retry.test.ts > R2 concurrent retry ownership across mutation instances > keeps the fence when an earlier 400 resolves while an identical replay is pending
+ FAIL  lib/review-r2-concurrent-retry.test.ts > R2 concurrent retry ownership across mutation instances > keeps the fence when an earlier 401 resolves while an identical replay is pending
+AssertionError: promise resolved "{ ok: true }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "ok": true,
+  }
+
+ ❯ lib/review-r2-concurrent-retry.test.ts:38:95
+     36|     expect((await a).status).toBe(status);
+     37|     try {
+     38|       await expect(createMutation(fetcher, options)("expenses", { ...p…
+       |                                                                                               ^
+     39|         .rejects.toThrow("OPERATION_RECONCILIATION_REQUIRED");
+     40|       expect(fetcher).toHaveBeenCalledTimes(2);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed (2)
+   Start at  20:19:23
+   Duration  377ms (transform 34ms, setup 0ms, import 127ms, tests 30ms, environment 0ms)
+

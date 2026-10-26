@@ -1,0 +1,37 @@
+
+ RUN  v4.1.11 D:/BANHANG/web/ca-bong-song-tra-nextjs-v1/ca-bong-song-tra-v1/apps/web
+
+ ❯ lib/receipt-costing.test.ts (2 tests | 1 failed) 7ms
+     × allocates zero-subtotal freight by quantity with remainder on the first largest weight 5ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  lib/receipt-costing.test.ts > purchase receipt costing preview (BUS03) > allocates zero-subtotal freight by quantity with remainder on the first largest weight
+AssertionError: expected [ +0, +0 ] to deeply equal [ 6, 1 ]
+
+- Expected
++ Received
+
+  [
+-   6,
+-   1,
++   0,
++   0,
+  ]
+
+ ❯ lib/receipt-costing.test.ts:10:66
+      8|       { sku: "CBST-400", qty: 1, purchasePriceVnd: 0 },
+      9|     ], 7);
+     10|     expect(preview.lines.map(line => line.allocatedShippingVnd)).toEqu…
+       |                                                                  ^
+     11|     expect(preview.lines.map(line => line.buckets)).toEqual([
+     12|       [{ qty: 3, landedUnitCostVnd: 2 }],
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  19:58:39
+   Duration  220ms (transform 20ms, setup 0ms, import 60ms, tests 7ms, environment 0ms)
+

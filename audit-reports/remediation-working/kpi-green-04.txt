@@ -1,0 +1,10 @@
+
+ RUN  v4.1.11 D:/BANHANG/web/ca-bong-song-tra-nextjs-v1/ca-bong-song-tra-v1/apps/api
+
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > rejects unsupported REVENUE at DTO and service/calculator boundaries 4ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  19:46:54
+   Duration  1.39s (transform 171ms, setup 0ms, import 1.24s, tests 5ms, environment 0ms)
+

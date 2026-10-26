@@ -3904,37 +3904,299 @@ footer p {
   }
 }
 
+/* Mobile Drawer Navigation Backdrop */
+.admin-sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 10, 8, 0.65);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 95;
+  animation: fadeInBackdrop 0.2s ease;
+}
+
+@keyframes fadeInBackdrop {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 @media (max-width: 900px) {
   .admin-shell {
     flex-direction: column;
+    min-height: 100dvh;
+    background-color: #F7F8FA;
+    position: relative;
   }
+
+  /* 1. Off-Canvas Sidebar Drawer */
   .admin-sidebar {
-    width: 100%;
-    min-width: 100%;
-    height: auto;
-    position: static;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 285px;
+    max-width: 85vw;
+    height: 100dvh;
+    height: 100vh;
+    z-index: 100;
+    background: #1C1512;
+    transform: translateX(-105%);
+    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.45);
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
   }
-  .admin-nav {
-    flex-direction: row;
-    overflow-x: auto;
-    padding: 8px 12px;
+
+  .admin-sidebar.mobile-open {
+    transform: translateX(0);
   }
-  .admin-nav-item {
-    white-space: nowrap;
-    width: auto;
+
+  .admin-brand {
+    padding: 16px 14px;
+    gap: 10px;
   }
-  .admin-topbar {
-    padding: 8px 16px;
-    height: auto;
-    min-height: 56px;
-    flex-wrap: wrap;
+
+  .admin-brand-actions {
+    display: flex;
+    align-items: center;
     gap: 8px;
   }
-  .admin-content-body {
-    padding: 20px 16px 48px;
+
+  .admin-sidebar-close-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    border: none;
+    color: #ffffff;
+    display: grid;
+    place-content: center;
+    cursor: pointer;
+    transition: background 0.15s;
   }
-  .admin-search-box {
+
+  .admin-sidebar-close-btn:hover {
+    background: rgba(255, 255, 255, 0.16);
+  }
+
+  .admin-nav {
+    flex-direction: column;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 12px 10px;
+    gap: 4px;
+  }
+
+  .admin-nav-item {
     width: 100%;
+    min-height: 44px;
+    padding: 10px 14px;
+    font-size: 0.92rem;
+  }
+
+  /* 2. Sleek Sticky Mobile Topbar */
+  .admin-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    height: 56px;
+    padding: 0 12px;
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid #E7E5E4;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .admin-topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .admin-mobile-menu-btn {
+    display: grid;
+    place-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 9px;
+    background: #F5F5F4;
+    border: 1px solid #E7E5E4;
+    color: #1C1917;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s;
+  }
+
+  .admin-mobile-menu-btn:active {
+    background: #E7E5E4;
+  }
+
+  .admin-topbar-mobile-brand {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+  }
+
+  .admin-topbar-mobile-brand .brand-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #D84012;
+    flex-shrink: 0;
+  }
+
+  .admin-topbar-mobile-brand .brand-title {
+    font-weight: 800;
+    font-size: 0.92rem;
+    color: #1C1917;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .admin-search-box {
+    display: none !important;
+  }
+
+  .admin-topbar-actions {
+    gap: 6px;
+  }
+
+  .admin-topbar-actions .btn-new-order {
+    padding: 6px 10px;
+    font-size: 0.8rem;
+    border-radius: 8px;
+    height: 34px;
+    gap: 4px;
+  }
+
+  .admin-lang-btn {
+    padding: 5px 9px;
+    font-size: 0.74rem;
+    height: 34px;
+  }
+
+  .notification-bell-wrap {
+    width: 34px;
+    height: 34px;
+  }
+
+  .topbar-user-avatar {
+    width: 34px;
+    height: 34px;
+    font-size: 0.78rem;
+    cursor: pointer;
+  }
+
+  /* 3. Mobile Content Body & Safe Areas */
+  .admin-content-body {
+    padding: 16px 12px calc(80px + env(safe-area-inset-bottom, 16px));
+  }
+
+  /* 4. Mobile Bottom Navigation Bar */
+  .admin-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    background: #ffffff;
+    border-top: 1px solid #E7E5E4;
+    box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.06);
+    padding: 6px 6px calc(6px + env(safe-area-inset-bottom, 0px));
+    justify-content: space-around;
+    align-items: center;
+  }
+
+  .admin-bottom-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    background: transparent;
+    border: none;
+    color: #78716C;
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 6px 2px;
+    border-radius: 8px;
+    cursor: pointer;
+    min-height: 48px;
+    transition: color 0.15s;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .admin-bottom-nav-item:active {
+    transform: scale(0.96);
+  }
+
+  .admin-bottom-nav-item.active {
+    color: #D84012;
+    font-weight: 700;
+  }
+
+  .nav-icon-relative {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .nav-bottom-badge {
+    position: absolute;
+    top: -5px;
+    right: -8px;
+    background: #D84012;
+    color: #ffffff;
+    font-size: 0.62rem;
+    font-weight: 800;
+    padding: 1px 5px;
+    border-radius: 10px;
+    line-height: 1.2;
+    border: 1px solid #ffffff;
+  }
+
+  .admin-bottom-nav-item.nav-fab-create {
+    color: #D84012;
+  }
+
+  .admin-bottom-nav-item.nav-fab-create .fab-inner-circle {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #D84012, #B9360F);
+    color: #ffffff;
+    display: grid;
+    place-content: center;
+    box-shadow: 0 4px 12px rgba(216, 64, 18, 0.35);
+    margin-top: -8px;
+    transition: transform 0.15s;
+  }
+
+  .admin-bottom-nav-item.nav-fab-create:active .fab-inner-circle {
+    transform: scale(0.92);
+  }
+}
+
+/* Hide mobile-specific items on desktop */
+@media (min-width: 901px) {
+  .admin-mobile-menu-btn,
+  .admin-topbar-mobile-brand,
+  .admin-sidebar-backdrop,
+  .admin-sidebar-close-btn,
+  .admin-bottom-nav {
+    display: none !important;
   }
 }
 
@@ -4333,14 +4595,268 @@ footer p {
 }
 
 @media (max-width: 640px) {
+  /* 2-Column Balanced KPI Grid for Phone screens (avoids endless 1-column scroll) */
+  .apex-hero-metrics,
+  .apex-hero-metrics.apex-hero-metrics-6 {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .apex-metric-card {
+    padding: 13px 12px 10px;
+    border-radius: 14px;
+    min-height: 108px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  }
+
+  .apex-metric-title {
+    font-size: 0.73rem;
+    font-weight: 600;
+    margin-bottom: 3px;
+    line-height: 1.25;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .apex-metric-val {
+    font-size: 1.25rem;
+    line-height: 1.2;
+    word-break: break-word;
+  }
+
+  .apex-metric-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+  }
+
+  .apex-metric-icon svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .apex-metric-trend {
+    font-size: 0.68rem;
+    margin-top: 6px;
+    line-height: 1.2;
+  }
+
+  .apex-metric-trend span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Compact Hero Dashboard Heading */
+  .dash-heading-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .dash-hero-title {
+    font-size: 1.35rem;
+    line-height: 1.25;
+  }
+
+  .dash-hero-sub {
+    font-size: 0.82rem;
+    line-height: 1.4;
+  }
+
+  .dash-heading-row > div:last-child {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .dash-heading-row .admin-refresh-btn {
+    flex: 1;
+    justify-content: center;
+    height: 42px;
+    padding: 8px 10px;
+    font-size: 0.82rem;
+  }
+
+  /* Responsive Apex Cards & Charts */
+  .apex-card {
+    padding: 16px 14px;
+    border-radius: 14px;
+    margin-bottom: 16px;
+  }
+
+  .apex-card h3 {
+    font-size: 0.96rem;
+  }
+
+  .sales-overview-card .card-header-flex {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .chart-pill-tabs {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    gap: 3px;
+    padding: 3px;
+  }
+
+  .chart-pill-tabs button {
+    flex: 1;
+    text-align: center;
+    padding: 6px 4px;
+    font-size: 0.74rem;
+  }
+
+  .area-chart-container {
+    height: 190px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Responsive Donut Chart */
+  .donut-center-wrap {
+    width: 140px;
+    height: 140px;
+    margin: 8px auto;
+  }
+
+  .donut-number {
+    font-size: 1.5rem;
+  }
+
+  .donut-legend {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 12px;
+  }
+
+  .legend-row {
+    font-size: 0.76rem;
+  }
+
+  /* Mini table in top products widget */
+  .mini-data-table th,
+  .mini-data-table td {
+    padding: 8px 6px;
+    font-size: 0.8rem;
+  }
+
+  /* Accounting Accordion */
+  .accounting-metrics-accordion {
+    padding: 14px 14px;
+    border-radius: 12px;
+    margin-top: 18px;
+  }
+
+  .accounting-metrics-accordion summary {
+    font-size: 0.86rem;
+  }
+
+  /* Orders filter bar mobile responsiveness */
+  .orders-filter-bar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    padding: 10px !important;
+    gap: 8px !important;
+  }
+
+  .orders-filter-group {
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+
+  .orders-search-wrap {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 1 1 100% !important;
+  }
+
+  select.cbst-order-filter-select {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    height: 42px !important;
+    font-size: 0.86rem !important;
+  }
+
+  .orders-filter-bar > div:last-child {
+    width: 100% !important;
+    justify-content: space-between !important;
+    padding-top: 6px !important;
+    border-top: 1px solid #F3F4F6 !important;
+  }
+
+  /* Pagination for mobile */
+  .pagination {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  .pagination button {
+    flex: 1;
+    min-height: 42px;
+    font-size: 0.85rem;
+  }
+
+  .pagination span {
+    font-size: 0.82rem;
+    white-space: nowrap;
+  }
+
+  /* Touch Stepper & Product Picker */
+  .product-picker-item {
+    padding: 12px 10px;
+    gap: 8px;
+  }
+  .product-picker-name {
+    font-size: 0.88rem;
+  }
+  .product-picker-meta {
+    font-size: 0.76rem;
+  }
+  .product-picker-price {
+    font-size: 0.88rem;
+  }
+  .stepper-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 1.1rem;
+  }
+  .stepper-input {
+    width: 38px;
+    height: 36px;
+    font-size: 0.9rem;
+  }
+  .internal-card-section {
+    padding: 16px 14px;
+    border-radius: 12px;
+    margin-bottom: 14px;
+  }
+  .order-summary-card {
+    position: static;
+    padding: 16px 14px;
+    border-radius: 12px;
+  }
+}
+
+@media (max-width: 360px) {
   .apex-hero-metrics,
   .apex-hero-metrics.apex-hero-metrics-6 {
     grid-template-columns: 1fr;
-  }
-  .dash-heading-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
   }
 }
 
@@ -5505,6 +6021,14 @@ button.cbst-scope-card.selected small {
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 16px;
   margin-bottom: 24px;
+}
+
+@media (max-width: 640px) {
+  .cbst-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
 }
 
 .cbst-kpi-card {

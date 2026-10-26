@@ -1,0 +1,49 @@
+
+ RUN  v4.1.11 D:/BANHANG/web/ca-bong-song-tra-nextjs-v1/ca-bong-song-tra-v1/apps/api
+
+ ✓ test/kpi.test.ts > KPI Service & Milestone Rewards > evaluates correct milestone tier based on highest delivered product quantity achieved 2ms
+ ✓ test/kpi.test.ts > KPI Service & Milestone Rewards > computes net delivered quantity excluding returned items 1ms
+ ✓ test/kpi.test.ts > KPI Service & Milestone Rewards > denies non-owner from creating policies or settling periods 1ms
+ ✓ test/kpi.test.ts > KPI Service & Milestone Rewards > settles KPI period: writes KPI_BONUS to ledger, updates member balance and creates awards 3ms
+ ✓ test/kpi.test.ts > KPI Service & Milestone Rewards > prevents double-settling an already settled period 1ms
+ ✓ test/kpi.test.ts > KPI Service & Milestone Rewards > calculates member progress against active period 1ms
+ ✓ test/v2.test.ts > V2 input boundary > accepts a minimal checkout and rejects price/member injection recursively 5ms
+ ✓ test/v2.test.ts > V2 input boundary > rejects fractional money, coerced quantities and unbounded payloads 1ms
+ ✓ test/v2.test.ts > V2 ownership and explicit projections > always puts member scope into the database query 1ms
+ ✓ test/v2.test.ts > V2 ownership and explicit projections > does not serialize internal fields, costs, or future secret fields for members 1ms
+ ✓ test/v2.test.ts > V2 ownership and explicit projections > projects nested customer fields rather than forwarding a stored object 0ms
+ ✓ test/v2.test.ts > V2 ownership and explicit projections > shows earned commission to the assigned member without exposing costs 1ms
+ ✓ test/v2.test.ts > V2 ownership and explicit projections > canonicalizes object keys but binds idempotency to values and array order 2ms
+ ✓ test/v2.test.ts > V2 ownership and explicit projections > calculates commission from delivered product margin at the member's rate 1ms
+ ✓ test/v2.test.ts > V2 transaction envelope > ends sessions even when a write fails and does not execute writes outside a transaction 2ms
+ ✓ test/v2.test.ts > ledger retry regression > replays a full refund before checking the remaining balance 1ms
+ ✓ test/v2.test.ts > ledger retry regression > rejects reusing a key with a different payload or ledger kind 0ms
+ ✓ test/v2-boundaries.test.ts > repository idempotency > replays without invoking business writes 3ms
+ ✓ test/v2-boundaries.test.ts > repository idempotency > rejects payload mismatch before invoking business writes 2ms
+ ✓ test/v2-boundaries.test.ts > repository idempotency > stores a successful response using the exact transaction session 2ms
+ ✓ test/v2-boundaries.test.ts > repository idempotency > does not persist a success response after a failed mutation 1ms
+ ✓ test/v2-boundaries.test.ts > service authorization > denies refund and payout to members before opening a transaction 1ms
+ ✓ test/v2-boundaries.test.ts > service authorization > checks current ownership before an idempotency replay 1ms
+ ✓ test/v2-boundaries.test.ts > HTTP security boundary > requires a bounded idempotency key 1ms
+ ✓ test/v2-boundaries.test.ts > HTTP security boundary > rejects a cookie mutation without Origin before authenticating 1ms
+ ✓ test/v2-boundaries.test.ts > HTTP security boundary > requires the nested customer object 3ms
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > rejects malformed settled snapshots rather than silently trusting missing windows or duplicate roster 4ms
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > rejects REVENUE settlement even when no members exist 0ms
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > accrues KPI expense once, while payout only moves cash (aggregation expression contract) 1ms
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > refuses a legacy REVENUE policy in member progress 0ms
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > freezes the complete settled roster, policy, zero results and window without any live reads 2ms
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > fails explicitly for legacy incomplete settled history instead of live recomputation 1ms
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > persists a positive award tied to its ledger and does not settle twice 1ms
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > blocks settlement while a period has not closed 0ms
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > queries delivered performance with half-open event boundaries only 1ms
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > selects active progress half-open without falling back to a future or ended period 0ms
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > rejects unsupported REVENUE at DTO and service/calculator boundaries 2ms
+ ✓ test/schemas.test.ts > MongoDB integrity schema > uses optimistic concurrency and a unique public order code 2ms
+ ✓ test/schemas.test.ts > MongoDB integrity schema > indexes FEFO allocation and prevents negative batch counters 0ms
+ ✓ test/schemas.test.ts > MongoDB integrity schema > expires opaque sessions by absolute expiry 0ms
+
+ Test Files  5 passed (5)
+      Tests  40 passed (40)
+   Start at  19:54:16
+   Duration  5.21s (transform 308ms, setup 0ms, import 4.17s, tests 57ms, environment 0ms)
+

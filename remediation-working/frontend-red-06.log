@@ -1,0 +1,37 @@
+
+ RUN  v4.1.11 D:/BANHANG/web/ca-bong-song-tra-nextjs-v1/ca-bong-song-tra-v1/apps/web
+
+ ❯ lib/financial-retry.test.ts (11 tests | 1 failed) 42ms
+     × does not generate a new payout reference on each retry and managers explain recovery 10ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  lib/financial-retry.test.ts > durable actor scoped operations > does not generate a new payout reference on each retry and managers explain recovery
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ lib/financial-retry.test.ts:11:55
+      9|     for (const name of ["CommissionManager","InventoryManager","Expens…
+     10|       const source=readFileSync(new URL(`./components/${name}.tsx`,imp…
+     11|       expect(source.includes("errorText(err, lang)")).toBe(true);
+       |                                                       ^
+     12|       if (name === "CommissionManager") expect(source.includes("`PAY-$…
+     13|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 10 passed (11)
+   Start at  19:53:44
+   Duration  502ms (transform 59ms, setup 0ms, import 306ms, tests 42ms, environment 0ms)
+
+undefined
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command "vitest" not found
+
+Did you mean "pnpm exec vitest"?

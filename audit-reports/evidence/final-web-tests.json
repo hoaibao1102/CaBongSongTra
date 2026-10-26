@@ -1,0 +1,6 @@
+{
+  "command": "pnpm --filter @cbst/web exec vitest run --maxWorkers=1",
+  "output": "RUN  v4.1.11 D:/BANHANG/web/ca-bong-song-tra-nextjs-v1/ca-bong-song-tra-v1/apps/web\n\n\n Test Files  18 passed (18)\n      Tests  167 passed (167)\n   Start at  19:04:18\n   Duration  8.28s (transform 1.45s, setup 0ms, import 3.93s, tests 581ms, environment 2ms)",
+  "exit_code": 0,
+  "error": null
+}

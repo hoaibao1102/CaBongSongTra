@@ -1,0 +1,138 @@
+
+ RUN  v4.1.11 D:/BANHANG/web/ca-bong-song-tra-nextjs-v1/ca-bong-song-tra-v1/apps/api
+
+ × test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > blocks settlement while a period has not closed 7ms
+   → promise resolved "{ periodId: 'p', …(3) }" instead of rejecting
+ × test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > queries delivered performance with half-open event boundaries only 2ms
+   → expected "vi.fn()" to be called with arguments: [ { responsibleMemberId: 'm', …(2) } ]
+
+Received:
+
+  1st vi.fn() call:
+
+@@ -1,11 +1,24 @@
+  [
+    {
++     "$or": [
++       {
+          "deliveredAt": {
+            "$gte": 2020-01-01T00:00:00.000Z,
+-       "$lt": 2020-02-01T00:00:00.000Z,
++           "$lte": 2020-02-01T00:00:00.000Z,
++         },
++       },
++       {
++         "createdAt": {
++           "$gte": 2020-01-01T00:00:00.000Z,
++           "$lte": 2020-02-01T00:00:00.000Z,
++         },
++         "deliveredAt": {
++           "$exists": false,
+          },
++       },
++     ],
+      "responsibleMemberId": "m",
+      "status": {
+        "$in": [
+          "DELIVERED",
+          "PARTIALLY_RETURNED",
+
+
+Number of calls: 1
+
+ × test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > selects active progress half-open without falling back to a future or ended period 1ms
+   → expected "vi.fn()" to be called 1 times, but got 2 times
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > rejects unsupported REVENUE at DTO and service/calculator boundaries 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > blocks settlement while a period has not closed
+AssertionError: promise resolved "{ periodId: 'p', …(3) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "awardsCount": 0,
++   "periodId": "p",
++   "status": "SETTLED",
++   "totalBonusVnd": 0,
+  }
+
+ ❯ test/remediation-kpi.test.ts:18:66
+     16|  it("blocks settlement while a period has not closed", async () => {
+     17|   const { service, period, db } = setup(); period.endDate = new Date("…
+     18|   await expect(service.settleKpiPeriod(owner, "p", {}, "k", "r")).reje…
+       |                                                                  ^
+     19|   expect(db.ledger.create).not.toHaveBeenCalled(); expect(db.kpiPeriod…
+     20|  });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > queries delivered performance with half-open event boundaries only
+AssertionError: expected "vi.fn()" to be called with arguments: [ { responsibleMemberId: 'm', …(2) } ]
+
+Received:
+
+  1st vi.fn() call:
+
+@@ -1,11 +1,24 @@
+  [
+    {
++     "$or": [
++       {
+          "deliveredAt": {
+            "$gte": 2020-01-01T00:00:00.000Z,
+-       "$lt": 2020-02-01T00:00:00.000Z,
++           "$lte": 2020-02-01T00:00:00.000Z,
++         },
++       },
++       {
++         "createdAt": {
++           "$gte": 2020-01-01T00:00:00.000Z,
++           "$lte": 2020-02-01T00:00:00.000Z,
++         },
++         "deliveredAt": {
++           "$exists": false,
+          },
++       },
++     ],
+      "responsibleMemberId": "m",
+      "status": {
+        "$in": [
+          "DELIVERED",
+          "PARTIALLY_RETURNED",
+
+
+Number of calls: 1
+
+ ❯ test/remediation-kpi.test.ts:24:26
+     22|   const { service, period, db } = setup();
+     23|   await service.computeDeliveredQty("m", period.startDate, period.endD…
+     24|   expect(db.orders.find).toHaveBeenCalledWith({ responsibleMemberId: "…
+       |                          ^
+     25|  });
+     26|  it("selects active progress half-open without falling back to a futur…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > selects active progress half-open without falling back to a future or ended period
+AssertionError: expected "vi.fn()" to be called 1 times, but got 2 times
+ ❯ test/remediation-kpi.test.ts:29:33
+     27|   const { service, db } = setup(); db.kpiPeriods.findOne.mockImplement…
+     28|   expect(await service.getMyKpiProgress({ id: "m", role: "MEMBER" })).…
+     29|   expect(db.kpiPeriods.findOne).toHaveBeenCalledTimes(1);
+       |                                 ^
+     30|   expect(db.kpiPeriods.findOne.mock.calls[0]).toEqual([{ status: "OPEN…
+     31|  });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 1 passed (4)
+   Start at  19:47:13
+   Duration  1.45s (transform 140ms, setup 0ms, import 1.27s, tests 15ms, environment 0ms)
+

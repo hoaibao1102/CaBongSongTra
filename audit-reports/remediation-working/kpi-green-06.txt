@@ -1,0 +1,16 @@
+
+ RUN  v4.1.11 D:/BANHANG/web/ca-bong-song-tra-nextjs-v1/ca-bong-song-tra-v1/apps/api
+
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > freezes the complete settled roster, policy, zero results and window without any live reads 4ms
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > fails explicitly for legacy incomplete settled history instead of live recomputation 1ms
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > persists a positive award tied to its ledger and does not settle twice 1ms
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > blocks settlement while a period has not closed 0ms
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > queries delivered performance with half-open event boundaries only 1ms
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > selects active progress half-open without falling back to a future or ended period 0ms
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > rejects unsupported REVENUE at DTO and service/calculator boundaries 2ms
+
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+   Start at  19:50:04
+   Duration  1.50s (transform 232ms, setup 0ms, import 1.33s, tests 10ms, environment 0ms)
+

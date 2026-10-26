@@ -1,0 +1,143 @@
+
+ RUN  v4.1.11 D:/BANHANG/web/ca-bong-song-tra-nextjs-v1/ca-bong-song-tra-v1/apps/api
+
+ × test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > rejects malformed settled snapshots rather than silently trusting missing windows or duplicate roster 8ms
+   → promise resolved "{ period: { id: 'p', …(9) }, …(3) }" instead of rejecting
+ × test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > rejects REVENUE settlement even when no members exist 1ms
+   → promise resolved "{ periodId: 'p', …(3) }" instead of rejecting
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > accrues KPI expense once, while payout only moves cash (aggregation expression contract) 1ms
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > refuses a legacy REVENUE policy in member progress 1ms
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > freezes the complete settled roster, policy, zero results and window without any live reads 1ms
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > fails explicitly for legacy incomplete settled history instead of live recomputation 0ms
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > persists a positive award tied to its ledger and does not settle twice 1ms
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > blocks settlement while a period has not closed 0ms
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > queries delivered performance with half-open event boundaries only 1ms
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > selects active progress half-open without falling back to a future or ended period 0ms
+ ✓ test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > rejects unsupported REVENUE at DTO and service/calculator boundaries 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > rejects malformed settled snapshots rather than silently trusting missing windows or duplicate roster
+AssertionError: promise resolved "{ period: { id: 'p', …(9) }, …(3) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "members": [
++     {
++       "achievedTierQty": null,
++       "bonusVnd": 0,
++       "deliveredQty": 0,
++       "displayName": "Original",
++       "email": "m@example.test",
++       "ledgerEntryId": undefined,
++       "memberId": "m",
++       "settled": true,
++       "status": "ACTIVE",
++     },
++   ],
++   "period": {
++     "createdAt": 1970-01-01T00:00:00.000Z,
++     "endDate": 2020-02-01T00:00:00.000Z,
++     "id": "p",
++     "name": "January",
++     "policyId": "policy",
++     "settledAt": 2026-10-24T12:51:55.060Z,
++     "settledBy": "owner",
++     "settlementSnapshot": {
++       "endDate": 2020-02-01T00:00:00.000Z,
++       "members": [
++         {
++           "achievedTierQty": null,
++           "bonusVnd": 0,
++           "deliveredQty": 0,
++           "displayName": "Original",
++           "email": "m@example.test",
++           "ledgerEntryId": undefined,
++           "memberId": "m",
++           "status": "ACTIVE",
++         },
++       ],
++       "policy": {
++         "active": true,
++         "createdAt": 1970-01-01T00:00:00.000Z,
++         "id": "policy",
++         "metric": "PRODUCT_QTY",
++         "name": "P",
++         "periodType": "CUSTOM",
++         "tiers": [
++           {
++             "bonusVnd": 50,
++             "minQty": 1,
++           },
++         ],
++         "updatedAt": 1970-01-01T00:00:00.000Z,
++       },
++       "totalBonusVnd": 0,
++       "version": 1,
++     },
++     "startDate": undefined,
++     "status": "SETTLED",
++   },
++   "policy": {
++     "active": true,
++     "createdAt": 1970-01-01T00:00:00.000Z,
++     "id": "policy",
++     "metric": "PRODUCT_QTY",
++     "name": "P",
++     "periodType": "CUSTOM",
++     "tiers": [
++       {
++         "bonusVnd": 50,
++         "minQty": 1,
++       },
++     ],
++     "updatedAt": 1970-01-01T00:00:00.000Z,
++   },
++   "totalBonusVnd": 0,
+  }
+
+ ❯ test/remediation-kpi.test.ts:22:54
+     20|    if (corrupt === "window") delete snapshot.startDate;
+     21|    else snapshot.members.push(snapshot.members[0]);
+     22|    await expect(service.previewKpiPeriod(owner, "p")).rejects.toThrow(…
+       |                                                      ^
+     23|   }
+     24|  });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/remediation-kpi.test.ts > KPI remediation (pure/service mocks; no database) > rejects REVENUE settlement even when no members exist
+AssertionError: promise resolved "{ periodId: 'p', …(3) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "awardsCount": 0,
++   "periodId": "p",
++   "status": "SETTLED",
++   "totalBonusVnd": 0,
+  }
+
+ ❯ test/remediation-kpi.test.ts:27:66
+     25|  it("rejects REVENUE settlement even when no members exist", async () …
+     26|   const { service, db } = setup(); db.users.find.mockImplementation(()…
+     27|   await expect(service.settleKpiPeriod(owner, "p", {}, "k", "r")).reje…
+       |                                                                  ^
+     28|  });
+     29|  it("accrues KPI expense once, while payout only moves cash (aggregati…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 9 passed (11)
+   Start at  19:51:53
+   Duration  1.42s (transform 163ms, setup 0ms, import 1.23s, tests 18ms, environment 0ms)
+

@@ -5991,8 +5991,10 @@ function AdminInner({
 }) {
   const queryClient = useQueryClient();
   const [section, updateSection] = useState(initialSection);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const setSection = (next: string) => {
     updateSection(next);
+    setMobileNavOpen(false);
     navigate(`/admin/${next}`);
   };
   useEffect(() => {
@@ -6003,6 +6005,7 @@ function AdminInner({
       updateSection(next);
       setPage(0);
       setSelected(null);
+      setMobileNavOpen(false);
       navigate(`/admin/${next}`, true);
     };
     syncSection();
@@ -6146,24 +6149,46 @@ function AdminInner({
 
   return (
     <div className="admin-shell">
-      {/* 1. Dark Modern Sidebar (Apex Style) */}
-      <aside className="admin-sidebar">
+      {/* Mobile Drawer Backdrop */}
+      {mobileNavOpen && (
+        <div
+          className="admin-sidebar-backdrop"
+          onClick={() => setMobileNavOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* 1. Dark Modern Sidebar (Apex Style / Mobile Off-Canvas Drawer) */}
+      <aside className={`admin-sidebar ${mobileNavOpen ? "mobile-open" : ""}`}>
         <div className="admin-brand">
+          <div className="admin-brand-emblem" aria-hidden="true">
+            CB
+          </div>
           <div className="admin-brand-text">
             <div className="admin-brand-title">Cá Bống Sông Trà</div>
             <div className="admin-brand-subtitle">
               {text(lang, "ĐẶC SẢN QUẢNG NGÃI", "QUANG NGAI SPECIALTY")}
             </div>
           </div>
-          <button
-            type="button"
-            className="sidebar-toggle-btn"
-            aria-label="Toggle sidebar"
-            onClick={onExitToStore}
-            title={text(lang, "Về cửa hàng", "Storefront")}
-          >
-            <ChevronLeft size={16} strokeWidth={2} />
-          </button>
+          <div className="admin-brand-actions">
+            <button
+              type="button"
+              className="sidebar-toggle-btn"
+              aria-label="Về cửa hàng"
+              onClick={onExitToStore}
+              title={text(lang, "Về cửa hàng", "Storefront")}
+            >
+              <ChevronLeft size={16} strokeWidth={2} />
+            </button>
+            <button
+              type="button"
+              className="admin-sidebar-close-btn"
+              aria-label={text(lang, "Đóng menu", "Close menu")}
+              onClick={() => setMobileNavOpen(false)}
+            >
+              <X size={18} strokeWidth={2} />
+            </button>
+          </div>
         </div>
 
         <nav
@@ -6249,16 +6274,35 @@ function AdminInner({
       {/* 2. Top Header & Workspace Canvas */}
       <div className="admin-main">
         <header className="admin-topbar">
-          <div className="admin-search-box">
-            <span aria-hidden="true" style={{ color: "#94a3b8", display: "inline-flex", alignItems: "center" }}>
-              <Search size={16} strokeWidth={1.8} />
-            </span>
-            <input
-              type="text"
-              placeholder={text(lang, "Tìm kiếm đơn hàng, khách hàng, mã vận đơn...", "Search anything...")}
-              readOnly
-            />
-            <span className="kbd-shortcut">⌘K</span>
+          <div className="admin-topbar-left">
+            <button
+              type="button"
+              className="admin-mobile-menu-btn"
+              aria-label={
+                mobileNavOpen
+                  ? text(lang, "Đóng menu điều hướng", "Close navigation menu")
+                  : text(lang, "Mở menu điều hướng", "Open navigation menu")
+              }
+              aria-expanded={mobileNavOpen}
+              onClick={() => setMobileNavOpen(!mobileNavOpen)}
+            >
+              {mobileNavOpen ? <X size={20} strokeWidth={2} /> : <Menu size={20} strokeWidth={2} />}
+            </button>
+            <div className="admin-topbar-mobile-brand">
+              <span className="brand-dot" />
+              <span className="brand-title">Cá Bống Sông Trà</span>
+            </div>
+            <div className="admin-search-box">
+              <span aria-hidden="true" style={{ color: "#94a3b8", display: "inline-flex", alignItems: "center" }}>
+                <Search size={16} strokeWidth={1.8} />
+              </span>
+              <input
+                type="text"
+                placeholder={text(lang, "Tìm kiếm đơn hàng, khách hàng, mã vận đơn...", "Search anything...")}
+                readOnly
+              />
+              <span className="kbd-shortcut">⌘K</span>
+            </div>
           </div>
 
           <div className="admin-topbar-actions">
@@ -6272,7 +6316,7 @@ function AdminInner({
               title={text(lang, "Tạo đơn hàng nội bộ mới", "Create new order")}
             >
               <Plus size={16} strokeWidth={2} />
-              <span>{text(lang, "Tạo đơn hàng", "New Order")}</span>
+              <span>{text(lang, "Tạo đơn", "New Order")}</span>
             </button>
 
             {onToggleLang && (
@@ -6297,7 +6341,15 @@ function AdminInner({
               <span className="notification-dot" />
             </div>
 
-            <div className="topbar-user-avatar">
+            <div
+              className="topbar-user-avatar"
+              onClick={() => {
+                if (owner) {
+                  setSection("users");
+                }
+              }}
+              title={actor.displayName ?? (owner ? "Hoài Bảo" : "Admin")}
+            >
               {owner ? "HB" : "AD"}
             </div>
           </div>
@@ -6957,6 +7009,77 @@ function AdminInner({
             />
           </Modal>
         </main>
+
+        {/* 3. Mobile Bottom Navigation Bar (Shopify/Grab-style thumb reach) */}
+        <nav className="admin-bottom-nav" aria-label={text(lang, "Thanh điều hướng nhanh", "Quick navigation")}>
+          <button
+            type="button"
+            className={`admin-bottom-nav-item ${section === "dashboard" && !mobileNavOpen ? "active" : ""}`}
+            onClick={() => {
+              setSection("dashboard");
+              setPage(0);
+              setSelected(null);
+            }}
+          >
+            <LayoutDashboard size={20} strokeWidth={section === "dashboard" && !mobileNavOpen ? 2.2 : 1.8} />
+            <span>{text(lang, "Tổng quan", "Overview")}</span>
+          </button>
+
+          <button
+            type="button"
+            className={`admin-bottom-nav-item ${section === "orders" && !mobileNavOpen ? "active" : ""}`}
+            onClick={() => {
+              setSection("orders");
+              setPage(0);
+              setSelected(null);
+            }}
+          >
+            <div className="nav-icon-relative">
+              <ShoppingCart size={20} strokeWidth={section === "orders" && !mobileNavOpen ? 2.2 : 1.8} />
+              {dashboardOrders.length > 0 && (
+                <span className="nav-bottom-badge">{dashboardOrders.length}</span>
+              )}
+            </div>
+            <span>{text(lang, "Đơn hàng", "Orders")}</span>
+          </button>
+
+          <button
+            type="button"
+            className="admin-bottom-nav-item nav-fab-create"
+            onClick={() => {
+              setShowCreateOrderModal(true);
+            }}
+            aria-label={text(lang, "Tạo đơn hàng mới", "Create new order")}
+          >
+            <div className="fab-inner-circle">
+              <Plus size={22} strokeWidth={2.5} />
+            </div>
+            <span>{text(lang, "Lên đơn", "New Order")}</span>
+          </button>
+
+          <button
+            type="button"
+            className={`admin-bottom-nav-item ${section === "inventory" && !mobileNavOpen ? "active" : ""}`}
+            onClick={() => {
+              setSection("inventory");
+              setPage(0);
+              setSelected(null);
+            }}
+          >
+            <Package size={20} strokeWidth={section === "inventory" && !mobileNavOpen ? 2.2 : 1.8} />
+            <span>{text(lang, "Kho hàng", "Stock")}</span>
+          </button>
+
+          <button
+            type="button"
+            className={`admin-bottom-nav-item ${mobileNavOpen || !["dashboard", "orders", "inventory"].includes(section) ? "active" : ""}`}
+            onClick={() => setMobileNavOpen((prev) => !prev)}
+            aria-label={text(lang, "Xem thêm menu", "More menu")}
+          >
+            <Menu size={20} strokeWidth={mobileNavOpen ? 2.2 : 1.8} />
+            <span>{text(lang, "Menu", "More")}</span>
+          </button>
+        </nav>
       </div>
     </div>
   );

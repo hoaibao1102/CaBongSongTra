@@ -1,0 +1,6 @@
+{
+  "command": "pnpm typecheck",
+  "output": "> ca-bong-song-tra-v2@2.0.0 typecheck D:\\BANHANG\\web\\ca-bong-song-tra-nextjs-v1\\ca-bong-song-tra-v1\n> pnpm -r typecheck\n\nScope: 2 of 3 workspace projects\napps/api typecheck$ tsc --noEmit\napps/web typecheck$ tsc --noEmit\napps/web typecheck: Done\napps/api typecheck: Done",
+  "exit_code": 0,
+  "error": null
+}

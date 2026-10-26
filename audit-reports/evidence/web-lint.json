@@ -1,0 +1,6 @@
+{
+  "command": "pnpm lint",
+  "output": "> @cbst/web@2.0.0 lint D:\\BANHANG\\web\\ca-bong-song-tra-nextjs-v1\\ca-bong-song-tra-v1\\apps\\web\n> eslint . --max-warnings=0\n\n\nD:\\BANHANG\\web\\ca-bong-song-tra-nextjs-v1\\ca-bong-song-tra-v1\\apps\\web\\lib\\components\\CommissionManager.tsx\n  10:3   error  'CreditCard' is defined but never used           @typescript-eslint/no-unused-vars\n  11:3   error  'History' is defined but never used              @typescript-eslint/no-unused-vars\n  13:3   error  'Award' is defined but never used                @typescript-eslint/no-unused-vars\n  18:3   error  'Sparkles' is defined but never used             @typescript-eslint/no-unused-vars\n  83:10  error  'kpiLoading' is assigned a value but never used  @typescript-eslint/no-unused-vars\n\nD:\\BANHANG\\web\\ca-bong-song-tra-nextjs-v1\\ca-bong-song-tra-v1\\apps\\web\\lib\\components\\MemberCommissions.tsx\n  7:10  error  'Award' is defined but never used       @typescript-eslint/no-unused-vars\n  7:25  error  'TrendingUp' is defined but never used  @typescript-eslint/no-unused-vars\n\n✖ 7 problems (7 errors, 0 warnings)\n\n ELIFECYCLE  Command failed with exit code 1.",
+  "exit_code": 1,
+  "error": null
+}
