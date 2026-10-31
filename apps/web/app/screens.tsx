@@ -4170,6 +4170,7 @@ export function MyOrdersWidget({
                 <th>{text(lang, "Ngày tạo", "Date")}</th>
                 <th>{text(lang, "Khách hàng", "Customer")}</th>
                 <th>{text(lang, "Số điện thoại", "Phone")}</th>
+                <th>{text(lang, "Số hũ", "Jars")}</th>
                 <th>{text(lang, "Tổng tiền", "Total")}</th>
                 <th>{text(lang, "Trạng thái", "Status")}</th>
                 <th>{text(lang, "Hoa hồng", "Commission")}</th>
@@ -4198,6 +4199,11 @@ export function MyOrdersWidget({
                     </td>
                     <td>{String(cust.name ?? "Khách vãng lai")}</td>
                     <td>{String(cust.phone ?? "—")}</td>
+                    <td style={{ fontWeight: 600 }}>
+                      {(o.items as Array<{ qty?: number }> || []).reduce((s, it) => s + Number(it.qty || 0), 0) > 0
+                        ? `${(o.items as Array<{ qty?: number }> || []).reduce((s, it) => s + Number(it.qty || 0), 0)} ${text(lang, "hũ", "jars")}`
+                        : "—"}
+                    </td>
                     <td style={{ fontWeight: 700 }}>
                       {money(Number(o.totalVnd ?? 0), lang)}
                     </td>
@@ -4267,7 +4273,7 @@ export function MemberLeaderboardWidget({
       setRecalculating(false);
     }
   };
-  const memberStats: Record<string, { memberId: string; totalOrders: number; deliveredOrders: number; revenue: number; commission: number }> = {};
+  const memberStats: Record<string, { memberId: string; totalOrders: number; deliveredOrders: number; totalJars: number; revenue: number; commission: number }> = {};
 
   for (const o of orders) {
     const memberId = String(o.responsibleMemberId ?? "").trim() || actor.id;
@@ -4276,6 +4282,7 @@ export function MemberLeaderboardWidget({
         memberId,
         totalOrders: 0,
         deliveredOrders: 0,
+        totalJars: 0,
         revenue: 0,
         commission: 0,
       };
@@ -4283,6 +4290,9 @@ export function MemberLeaderboardWidget({
     memberStats[memberId].totalOrders += 1;
     if (o.status === "DELIVERED") {
       memberStats[memberId].deliveredOrders += 1;
+      const lineQty = (o.items as Array<{ qty?: number }> || []).reduce((sum, it) => sum + Number(it.qty || 0), 0);
+      const returnedQty = (o.allocations as Array<{ returnedQty?: number }> || []).reduce((sum, al) => sum + Number(al.returnedQty || 0), 0);
+      memberStats[memberId].totalJars += Math.max(0, lineQty - returnedQty);
       memberStats[memberId].revenue += Number(o.totalVnd ?? 0);
       memberStats[memberId].commission += Number(o.commissionVnd ?? 0);
     }
@@ -4337,6 +4347,7 @@ export function MemberLeaderboardWidget({
                 <th>{text(lang, "Thành viên / CTV", "Member")}</th>
                 <th>{text(lang, "Tổng đơn", "Total Orders")}</th>
                 <th>{text(lang, "Đơn thành công", "Delivered")}</th>
+                <th>{text(lang, "Số hũ đã bán", "Jars Sold")}</th>
                 <th>{text(lang, "Doanh số đem về", "Revenue")}</th>
                 <th>{text(lang, "Hoa hồng đạt được", "Commission")}</th>
               </tr>
@@ -4352,6 +4363,7 @@ export function MemberLeaderboardWidget({
                   </td>
                   <td>{m.totalOrders}</td>
                   <td style={{ fontWeight: 700, color: "#16A34A" }}>{m.deliveredOrders}</td>
+                  <td style={{ fontWeight: 700, color: "#EA580C" }}>{m.totalJars} {text(lang, "hũ", "jars")}</td>
                   <td style={{ fontWeight: 700 }}>{money(m.revenue, lang)}</td>
                   <td style={{ fontWeight: 700, color: "#7E22CE" }}>{money(m.commission, lang)}</td>
                 </tr>
@@ -6075,6 +6087,22 @@ function AdminInner({
   const isBackgroundFetching = sectionQuery.isFetching;
   const dashboardOrders = (dashboardOrdersQuery.data as RecordRow[]) || [];
   const allUsers = (usersQuery.data as MemberUser[]) || [];
+  const computeDeliveredJarsFromOrders = (ordersList: RecordRow[]) => {
+    return ordersList
+      .filter((o) => ["DELIVERED", "PARTIALLY_RETURNED"].includes(String(o.status)))
+      .reduce((sum, o) => {
+        const lineQty = (o.items as Array<{ qty?: number }> || []).reduce((s, it) => s + Number(it.qty || 0), 0);
+        const returnedQty = (o.allocations as Array<{ returnedQty?: number }> || []).reduce((s, al) => s + Number(al.returnedQty || 0), 0);
+        return sum + Math.max(0, lineQty - returnedQty);
+      }, 0);
+  };
+  const deliveredJarsFallback = computeDeliveredJarsFromOrders(dashboardOrders);
+  const deliveredJarsCount =
+    dashboard?.deliveredUnits != null
+      ? Number(dashboard.deliveredUnits)
+      : dashboard?.totalUnits != null
+        ? Number(dashboard.totalUnits)
+        : deliveredJarsFallback;
 
   // Security: Handle session expiration and 401s by wiping cache
   useEffect(() => {
@@ -6431,8 +6459,8 @@ function AdminInner({
                 ) : (
                   dashboard && (
                     <>
-                      {/* 6 Hero KPI Metric Cards for Owner */}
-                      <div className="apex-hero-metrics apex-hero-metrics-6">
+                      {/* 8 Hero KPI Metric Cards for Owner */}
+                      <div className="apex-hero-metrics">
                         {/* Card 1: Total Sales */}
                         <div className="apex-metric-card">
                           <div className="apex-metric-top">
@@ -6449,6 +6477,29 @@ function AdminInner({
                             </div>
                             <div className="apex-metric-icon bg-brand-light">
                               <Banknote size={20} strokeWidth={1.8} />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Card: Total Jars Sold */}
+                        <div className="apex-metric-card">
+                          <div className="apex-metric-top">
+                            <div>
+                              <div className="apex-metric-title">
+                                {text(lang, "Tổng số hũ bán được", "Total Jars Sold")}
+                              </div>
+                              <div className="apex-metric-val">
+                                {deliveredJarsCount.toLocaleString(lang === "vi" ? "vi-VN" : "en-US")}
+                                <span style={{ fontSize: "1rem", fontWeight: 600, color: "#78716C", marginLeft: 4 }}>
+                                  {text(lang, "hũ", "jars")}
+                                </span>
+                              </div>
+                              <div className="apex-metric-trend text-muted">
+                                <span>{text(lang, "Hũ đã giao thành công", "Delivered jar units")}</span>
+                              </div>
+                            </div>
+                            <div className="apex-metric-icon bg-brand-light">
+                              <Package size={20} strokeWidth={1.8} />
                             </div>
                           </div>
                         </div>
@@ -6517,6 +6568,26 @@ function AdminInner({
                             </div>
                             <div className="apex-metric-icon bg-purple-light">
                               <BadgePercent size={20} strokeWidth={1.8} />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Card: Processing Orders */}
+                        <div className="apex-metric-card">
+                          <div className="apex-metric-top">
+                            <div>
+                              <div className="apex-metric-title">
+                                {text(lang, "Đơn đang xử lý", "Processing Orders")}
+                              </div>
+                              <div className="apex-metric-val">
+                                {Number(dashboard.pendingCostOrders ?? 0)}
+                              </div>
+                              <div className="apex-metric-trend text-muted">
+                                <span>{text(lang, "Đang vận chuyển hoặc chờ duyệt", "In transit or pending")}</span>
+                              </div>
+                            </div>
+                            <div className="apex-metric-icon bg-amber-light">
+                              <Clock size={20} strokeWidth={1.8} />
                             </div>
                           </div>
                         </div>
@@ -6643,7 +6714,7 @@ function AdminInner({
                       onClick={() => setSection("create-order")}
                     >
                       <PackagePlus size={14} strokeWidth={2} style={{ marginRight: 6 }} />
-                      {text(lang, "+ Tạo đơn nội bộ mới", "+ Create Internal Order")}
+                      {text(lang, "+ Tạo đơn nội bộ", "+ Create Order")}
                     </button>
                     <button className="admin-refresh-btn" onClick={refresh}>
                       <RefreshCw size={14} strokeWidth={1.8} style={{ marginRight: 6 }} />
@@ -6657,29 +6728,9 @@ function AdminInner({
                 ) : (
                   dashboard && (
                     <>
-                      {/* 4 Hero KPI Metric Cards for Member */}
-                      <div className="apex-hero-metrics">
-                        {/* Member Card 1: Commission Earned */}
-                        <div className="apex-metric-card">
-                          <div className="apex-metric-top">
-                            <div>
-                              <div className="apex-metric-title">
-                                {text(lang, "Hoa hồng tích luỹ (Đã chốt)", "Earned Commissions")}
-                              </div>
-                              <div className="apex-metric-val">
-                                {money(Number(dashboard.commissionVnd ?? 0), lang)}
-                              </div>
-                              <div className="apex-metric-trend text-muted">
-                                <span>{text(lang, "Từ các đơn đã giao thành công", "Delivered & settled orders")}</span>
-                              </div>
-                            </div>
-                            <div className="apex-metric-icon bg-purple-light">
-                              <BadgePercent size={20} strokeWidth={1.8} />
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Member Card 2: Personal Sales Volume */}
+                      {/* 6 Hero KPI Metric Cards for Member */}
+                      <div className="apex-hero-metrics apex-hero-metrics-6">
+                        {/* Member Card 1: Personal Sales Volume */}
                         <div className="apex-metric-card">
                           <div className="apex-metric-top">
                             <div>
@@ -6695,6 +6746,29 @@ function AdminInner({
                             </div>
                             <div className="apex-metric-icon bg-brand-light">
                               <Banknote size={20} strokeWidth={1.8} />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Member Card 2: Total Jars Sold */}
+                        <div className="apex-metric-card">
+                          <div className="apex-metric-top">
+                            <div>
+                              <div className="apex-metric-title">
+                                {text(lang, "Tổng số hũ bán được", "Total Jars Sold")}
+                              </div>
+                              <div className="apex-metric-val">
+                                {deliveredJarsCount.toLocaleString(lang === "vi" ? "vi-VN" : "en-US")}
+                                <span style={{ fontSize: "1rem", fontWeight: 600, color: "#78716C", marginLeft: 4 }}>
+                                  {text(lang, "hũ", "jars")}
+                                </span>
+                              </div>
+                              <div className="apex-metric-trend text-muted">
+                                <span>{text(lang, "Hũ đã giao thành công", "Delivered jars")}</span>
+                              </div>
+                            </div>
+                            <div className="apex-metric-icon bg-brand-light">
+                              <Package size={20} strokeWidth={1.8} />
                             </div>
                           </div>
                         </div>
@@ -6719,7 +6793,55 @@ function AdminInner({
                           </div>
                         </div>
 
-                        {/* Member Card 4: In Progress / Pending Cost Finalization */}
+                        {/* Member Card 4: Commission Earned */}
+                        <div className="apex-metric-card">
+                          <div className="apex-metric-top">
+                            <div>
+                              <div className="apex-metric-title">
+                                {text(lang, "Hoa hồng tích luỹ (Đã chốt)", "Earned Commissions")}
+                              </div>
+                              <div className="apex-metric-val">
+                                {money(Number(dashboard.commissionVnd ?? 0), lang)}
+                              </div>
+                              <div className="apex-metric-trend text-muted">
+                                <span>{text(lang, "Từ các đơn đã giao thành công", "Delivered & settled orders")}</span>
+                              </div>
+                            </div>
+                            <div className="apex-metric-icon bg-purple-light">
+                              <BadgePercent size={20} strokeWidth={1.8} />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Member Card 5: Avg Order Value */}
+                        <div className="apex-metric-card">
+                          <div className="apex-metric-top">
+                            <div>
+                              <div className="apex-metric-title">
+                                {text(lang, "Giá trị TB đơn", "Avg Order Value")}
+                              </div>
+                              <div className="apex-metric-val">
+                                {dashboard.deliveredOrders && Number(dashboard.deliveredOrders) > 0
+                                  ? money(
+                                      Math.round(
+                                        Number(dashboard.revenueVnd ?? 0) /
+                                          Number(dashboard.deliveredOrders),
+                                      ),
+                                      lang,
+                                    )
+                                  : "—"}
+                              </div>
+                              <div className="apex-metric-trend text-muted">
+                                <span>{text(lang, "Doanh số trung bình / đơn", "Average per delivered order")}</span>
+                              </div>
+                            </div>
+                            <div className="apex-metric-icon bg-blue-light">
+                              <TrendingUp size={20} strokeWidth={1.8} />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Member Card 6: In Progress / Pending Cost Finalization */}
                         <div className="apex-metric-card">
                           <div className="apex-metric-top">
                             <div>

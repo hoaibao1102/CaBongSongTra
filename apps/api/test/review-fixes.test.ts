@@ -49,3 +49,10 @@ it("excludes delivered orders from a member's processing dashboard count", async
   });
   expect(result.pendingCostOrders).toBe(2);
 });
+it("includes deliveredUnits and totalUnits in dashboard aggregation result", async () => {
+  const aggregate = vi.fn().mockResolvedValueOnce([{ deliveredOrders: 5, deliveredUnits: 25, revenueVnd: 500000 }]).mockResolvedValueOnce([]);
+  const db = { orders: { aggregate, countDocuments: vi.fn(async () => 0) }, ledger: { aggregate: vi.fn(async () => []) } };
+  const result = await new CommerceService(db as never).dashboard({ id: "owner", role: "OWNER_ADMIN" });
+  expect(result.deliveredUnits).toBe(25);
+  expect(result.totalUnits).toBe(25);
+});

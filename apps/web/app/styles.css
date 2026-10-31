@@ -2473,57 +2473,72 @@ fieldset .check + button {
 .apex-hero-metrics {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
-  margin-bottom: 24px;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
 .apex-hero-metrics.apex-hero-metrics-6 {
   grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
 .apex-metric-card {
   background: #ffffff;
   border: 1px solid #E7E5E4;
-  border-radius: 16px;
-  padding: 22px 24px 18px;
+  border-radius: 12px;
+  padding: 13px 15px 11px;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  min-height: 140px;
+  min-height: 92px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.apex-metric-card:hover {
+  border-color: #D6D3D1;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.04);
 }
 
 .apex-metric-top {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  gap: 8px;
 }
 
 .apex-metric-title {
-  font-size: 0.84rem;
+  font-size: 0.78rem;
   font-weight: 600;
   color: #78716C;
-  margin-bottom: 6px;
+  margin-bottom: 3px;
+  line-height: 1.25;
 }
 
 .apex-metric-val {
-  font-size: 1.85rem;
+  font-size: 1.35rem;
   font-weight: 800;
   color: #1C1917;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.015em;
   font-variant-numeric: tabular-nums;
-  line-height: 1.15;
+  line-height: 1.2;
 }
 
 .apex-metric-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
   display: grid;
   place-content: center;
   flex-shrink: 0;
+}
+
+.apex-metric-icon svg {
+  width: 17px;
+  height: 17px;
 }
 
 .bg-brand-light { background: #FFF0E8; color: #D84012; }
@@ -2537,10 +2552,11 @@ fieldset .check + button {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  margin-top: 10px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  margin-top: 5px;
   color: #78716C;
+  line-height: 1.2;
 }
 
 .metric-status-sub {
@@ -4595,26 +4611,34 @@ footer p {
 }
 
 @media (max-width: 640px) {
-  /* 2-Column Balanced KPI Grid for Phone screens (avoids endless 1-column scroll) */
+  /* 2-Column Balanced KPI Grid for Mobile (avoids endless 1-column scroll and prevents text wrapping) */
   .apex-hero-metrics,
   .apex-hero-metrics.apex-hero-metrics-6 {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
-    margin-bottom: 16px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 14px;
   }
 
   .apex-metric-card {
-    padding: 13px 12px 10px;
-    border-radius: 14px;
-    min-height: 108px;
+    position: relative;
+    padding: 10px 10px 8px;
+    border-radius: 12px;
+    min-height: 80px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    overflow: hidden;
+  }
+
+  .apex-metric-top {
+    display: block;
+    width: 100%;
   }
 
   .apex-metric-title {
-    font-size: 0.73rem;
+    font-size: 0.72rem;
     font-weight: 600;
     margin-bottom: 3px;
-    line-height: 1.25;
+    line-height: 1.22;
+    padding-right: 28px;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
@@ -4622,26 +4646,42 @@ footer p {
   }
 
   .apex-metric-val {
-    font-size: 1.25rem;
+    font-size: clamp(0.96rem, 3.8vw, 1.22rem);
     line-height: 1.2;
-    word-break: break-word;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums;
+    word-break: normal;
+  }
+
+  .apex-metric-val span {
+    font-size: 0.8rem !important;
+    margin-left: 2px !important;
   }
 
   .apex-metric-icon {
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
+    position: absolute;
+    top: 9px;
+    right: 9px;
+    width: 25px;
+    height: 25px;
+    border-radius: 6px;
   }
 
   .apex-metric-icon svg {
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
   }
 
   .apex-metric-trend {
-    font-size: 0.68rem;
-    margin-top: 6px;
-    line-height: 1.2;
+    font-size: 0.66rem;
+    margin-top: 3px;
+    line-height: 1.15;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
   }
 
   .apex-metric-trend span {
@@ -4654,18 +4694,20 @@ footer p {
   .dash-heading-row {
     flex-direction: column;
     align-items: stretch;
-    gap: 12px;
-    margin-bottom: 16px;
+    gap: 10px;
+    margin-bottom: 14px;
   }
 
   .dash-hero-title {
-    font-size: 1.35rem;
-    line-height: 1.25;
+    font-size: 1.25rem;
+    line-height: 1.22;
+    font-weight: 800;
   }
 
   .dash-hero-sub {
-    font-size: 0.82rem;
-    line-height: 1.4;
+    font-size: 0.78rem;
+    line-height: 1.35;
+    color: #6B7280;
   }
 
   .dash-heading-row > div:last-child {
@@ -4675,90 +4717,242 @@ footer p {
   }
 
   .dash-heading-row .admin-refresh-btn {
-    flex: 1;
-    justify-content: center;
-    height: 42px;
-    padding: 8px 10px;
+    height: 38px;
+    padding: 0 10px;
     font-size: 0.82rem;
+    white-space: nowrap;
+    justify-content: center;
+  }
+
+  .dash-heading-row .admin-refresh-btn:first-child {
+    flex: 1.4;
+  }
+
+  .dash-heading-row .admin-refresh-btn:last-child {
+    flex: 1;
   }
 
   /* Responsive Apex Cards & Charts */
   .apex-card {
-    padding: 16px 14px;
-    border-radius: 14px;
-    margin-bottom: 16px;
+    padding: 14px 12px;
+    border-radius: 12px;
+    margin-bottom: 14px;
   }
 
   .apex-card h3 {
-    font-size: 0.96rem;
+    font-size: 0.92rem;
+  }
+
+  .apex-card .card-subtitle {
+    font-size: 0.76rem;
   }
 
   .sales-overview-card .card-header-flex {
     flex-direction: column;
     align-items: stretch;
-    gap: 10px;
-    margin-bottom: 12px;
+    gap: 8px;
+    margin-bottom: 10px;
   }
 
   .chart-pill-tabs {
     width: 100%;
     display: flex;
     justify-content: space-between;
-    gap: 3px;
-    padding: 3px;
+    gap: 2px;
+    padding: 2px;
   }
 
   .chart-pill-tabs button {
     flex: 1;
     text-align: center;
-    padding: 6px 4px;
-    font-size: 0.74rem;
+    padding: 5px 3px;
+    font-size: 0.72rem;
   }
 
   .area-chart-container {
-    height: 190px;
+    height: 180px;
+    width: 100%;
+    overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+  }
+
+  .area-chart-svg {
+    min-width: 100%;
+    width: 100%;
+    height: 100%;
   }
 
   /* Responsive Donut Chart */
   .donut-center-wrap {
-    width: 140px;
-    height: 140px;
-    margin: 8px auto;
+    width: 126px;
+    height: 126px;
+    margin: 4px auto 6px;
   }
 
   .donut-number {
-    font-size: 1.5rem;
+    font-size: 1.4rem;
   }
 
   .donut-legend {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    margin-top: 12px;
-    padding-top: 12px;
+    gap: 6px 10px;
+    margin-top: 10px;
+    padding-top: 10px;
   }
 
   .legend-row {
-    font-size: 0.76rem;
+    font-size: 0.74rem;
   }
 
   /* Mini table in top products widget */
   .mini-data-table th,
   .mini-data-table td {
-    padding: 8px 6px;
+    padding: 7px 5px;
+    font-size: 0.78rem;
+  }
+
+  .prod-name-bold {
+    font-size: 0.8rem;
+    line-height: 1.25;
+  }
+
+  .prod-sub-tag {
+    font-size: 0.68rem;
+  }
+
+  .cat-bars-list {
+    gap: 12px;
+    margin-top: 12px;
+  }
+
+  .cat-bar-label-row {
     font-size: 0.8rem;
   }
 
-  /* Accounting Accordion */
-  .accounting-metrics-accordion {
-    padding: 14px 14px;
+  /* Member Inventory Widget */
+  .cbst-member-inventory-widget {
+    padding: 14px 12px;
     border-radius: 12px;
-    margin-top: 18px;
+    margin-bottom: 14px;
+  }
+
+  .cbst-sku-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  .cbst-sku-card {
+    padding: 12px 10px;
+    border-radius: 10px;
+  }
+
+  .cbst-sku-name {
+    font-size: 0.88rem;
+  }
+
+  .cbst-commission-card {
+    padding: 9px 10px;
+    margin: 8px 0;
+    border-radius: 8px;
+  }
+
+  .cbst-commission-card-val {
+    font-size: 1.15rem;
+  }
+
+  .cbst-sku-order-btn {
+    height: 38px !important;
+    font-size: 0.82rem !important;
+  }
+
+  /* Responsive Orders & Leaderboard Tables */
+  .member-orders-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 8px;
+    border: 1px solid #E7E5E4;
+    margin-top: 8px;
+  }
+
+  .member-orders-table {
+    min-width: 580px;
+    width: 100%;
+    font-size: 0.8rem;
+  }
+
+  .member-orders-table th {
+    padding: 8px 10px;
+    font-size: 0.72rem;
+    white-space: nowrap;
+    background: #FAFAF9;
+  }
+
+  .member-orders-table td {
+    padding: 9px 10px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+
+  /* Filter Tab Bar in My Orders */
+  .filter-tab-bar {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    -webkit-overflow-scrolling: touch;
+    margin: 10px 0 12px;
+    padding: 2px 0 6px;
+  }
+
+  .filter-tab-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .filter-tab-btn {
+    padding: 5px 11px;
+    font-size: 0.76rem;
+    border-radius: 6px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* Accounting Accordion & Metrics Ledger */
+  .accounting-metrics-accordion {
+    padding: 12px 10px;
+    border-radius: 10px;
+    margin-top: 14px;
   }
 
   .accounting-metrics-accordion summary {
-    font-size: 0.86rem;
+    font-size: 0.82rem;
+    line-height: 1.35;
+  }
+
+  .metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin: 12px 0;
+  }
+
+  .metrics > div {
+    padding: 10px 10px;
+    border-radius: 8px;
+  }
+
+  .metrics dt {
+    font-size: 0.66rem;
+    letter-spacing: 0.02em;
+    line-height: 1.25;
+  }
+
+  .metrics dd {
+    font-size: 1rem;
+    margin: 3px 0 0;
+    line-height: 1.2;
+    font-weight: 700;
   }
 
   /* Orders filter bar mobile responsiveness */
@@ -4850,13 +5044,6 @@ footer p {
     position: static;
     padding: 16px 14px;
     border-radius: 12px;
-  }
-}
-
-@media (max-width: 360px) {
-  .apex-hero-metrics,
-  .apex-hero-metrics.apex-hero-metrics-6 {
-    grid-template-columns: 1fr;
   }
 }
 
@@ -6834,3 +7021,13 @@ select.cbst-order-filter-select.active-amber {
   transform: none !important;
 }
 
+
+
+/* Spinner Animation */
+@keyframes cbstSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.cbst-spin {
+  animation: cbstSpin 0.8s linear infinite;
+}

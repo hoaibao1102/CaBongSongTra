@@ -107,6 +107,8 @@ const labels: Record<string, [string, string]> = {
   asOf: ["Cập nhật lúc", "As of"],
   timezone: ["Múi giờ", "Timezone"],
   deliveredOrders: ["Đơn đã giao", "Delivered orders"],
+  deliveredUnits: ["Tổng số hũ bán được", "Total jars sold"],
+  totalUnits: ["Tổng số hũ bán được", "Total jars sold"],
   revenueVnd: ["Doanh thu", "Revenue"],
   pendingCostOrders: ["Đơn chưa chốt chi phí", "Orders awaiting costs"],
   overheadVnd: ["Chi phí chung", "Overhead"],

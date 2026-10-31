@@ -138,6 +138,26 @@ describe("bilingual usable screens", () => {
     ])
       expect(html).toContain(text);
   });
+  it("renders jars sold metric in member leaderboard widget", () => {
+    const html = renderToStaticMarkup(
+      <MemberLeaderboardWidget
+        lang="vi"
+        actor={{ id: "admin-id", role: "OWNER_ADMIN" }}
+        users={[]}
+        orders={[
+          {
+            id: "o1",
+            status: "DELIVERED",
+            totalVnd: 200000,
+            items: [{ sku: "CBST-300", qty: 5 }],
+            allocations: [{ batchId: "b1", sku: "CBST-300", qty: 5, returnedQty: 1 }],
+          },
+        ]}
+      />,
+    );
+    expect(html).toContain("Số hũ đã bán");
+    expect(html).toContain("4 hũ");
+  });
   it("requires deliberate owner confirmation before issuing a reset token", () => {
     const html = renderToStaticMarkup(<ResetIssue id="member" lang="en" />);
     expect(html).toContain("required");

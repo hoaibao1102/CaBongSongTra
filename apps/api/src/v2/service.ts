@@ -655,7 +655,7 @@ export class CommerceService {
   async dashboard(actor: Actor) {
     const scope = orderScope(actor);
     const match = { ...scope, deliveredAt: { $exists: true } };
-    const [totals] = await this.db.orders.aggregate([{ $match: match }, { $group: { _id: null, deliveredOrders: { $sum: 1 }, revenueVnd: { $sum: { $subtract: [{ $add: ["$totalVnd", { $ifNull: ["$returnRefundsVnd", 0] }] }, { $add: ["$refundsVnd", { $ifNull: ["$returnValueVnd", 0] }] }] } }, cogsVnd: { $sum: "$cogsVnd" }, directCostsVnd: { $sum: "$directCostsVnd" }, commissionVnd: { $sum: "$commissionVnd" }, pendingCostOrders: { $sum: { $cond: ["$costsFinalized", 0, 1] } } } }]);
+    const [totals] = await this.db.orders.aggregate([{ $match: match }, { $group: { _id: null, deliveredOrders: { $sum: 1 }, deliveredUnits: { $sum: { $subtract: [{ $ifNull: [{ $sum: "$items.qty" }, 0] }, { $ifNull: [{ $sum: "$allocations.returnedQty" }, 0] }] } }, revenueVnd: { $sum: { $subtract: [{ $add: ["$totalVnd", { $ifNull: ["$returnRefundsVnd", 0] }] }, { $add: ["$refundsVnd", { $ifNull: ["$returnValueVnd", 0] }] }] } }, cogsVnd: { $sum: "$cogsVnd" }, directCostsVnd: { $sum: "$directCostsVnd" }, commissionVnd: { $sum: "$commissionVnd" }, pendingCostOrders: { $sum: { $cond: ["$costsFinalized", 0, 1] } } } }]);
     const processingOrders = await this.db.orders.countDocuments({
       ...scope,
       status: { $nin: ["DELIVERED", "CANCELLED", "RETURNED"] },
@@ -663,7 +663,7 @@ export class CommerceService {
     const [cash] = actor.role === "OWNER_ADMIN" ? await this.db.ledger.aggregate([{ $group: { _id: null, cashMovementVnd: { $sum: { $switch: { branches: [{ case: { $eq: ["$kind", "PAYMENT"] }, then: "$amountVnd" }, { case: { $in: ["$kind", ["REFUND", "EXPENSE", "PAYOUT"]] }, then: { $multiply: ["$amountVnd", -1] } }], default: 0 } } }, kpiBonusVnd: { $sum: { $cond: [{ $eq: ["$kind", "KPI_BONUS"] }, "$amountVnd", 0] } }, overheadVnd: { $sum: { $cond: [{ $and: [{ $eq: ["$kind", "EXPENSE"] }, { $eq: ["$scope", "OVERHEAD"] }] }, "$amountVnd", 0] } } } }]) : [];
     const [losses] = actor.role === "OWNER_ADMIN" ? await this.db.orders.aggregate([{ $match: { deliveredAt: { $exists: false }, status: "RETURNED", shippedAt: { $exists: true } } }, { $group: { _id: null, inventoryLossVnd: { $sum: "$cogsVnd" }, directCostsVnd: { $sum: "$directCostsVnd" } } }]) : [];
     const failedDeliveryLossVnd = (losses?.inventoryLossVnd ?? 0) + (losses?.directCostsVnd ?? 0);
-    return { asOf: new Date().toISOString(), timezone: "Asia/Ho_Chi_Minh", deliveredOrders: totals?.deliveredOrders ?? 0, revenueVnd: totals?.revenueVnd ?? 0, commissionVnd: totals?.commissionVnd ?? 0, pendingCostOrders: processingOrders,
+    return { asOf: new Date().toISOString(), timezone: "Asia/Ho_Chi_Minh", deliveredOrders: totals?.deliveredOrders ?? 0, deliveredUnits: totals?.deliveredUnits ?? 0, totalUnits: totals?.deliveredUnits ?? 0, revenueVnd: totals?.revenueVnd ?? 0, commissionVnd: totals?.commissionVnd ?? 0, pendingCostOrders: processingOrders,
       ...(actor.role === "OWNER_ADMIN" ? { failedDeliveryLossVnd, failedDeliveryInventoryLossVnd: losses?.inventoryLossVnd ?? 0, failedDeliveryDirectCostsVnd: losses?.directCostsVnd ?? 0, cogsVnd: totals?.cogsVnd ?? 0, directCostsVnd: totals?.directCostsVnd ?? 0, overheadVnd: cash?.overheadVnd ?? 0, kpiBonusVnd: cash?.kpiBonusVnd ?? 0, operatingCashMovementVnd: cash?.cashMovementVnd ?? 0, netProfitVnd: (totals?.revenueVnd ?? 0) - (totals?.cogsVnd ?? 0) - (totals?.directCostsVnd ?? 0) - (totals?.commissionVnd ?? 0) - (cash?.overheadVnd ?? 0) - (cash?.kpiBonusVnd ?? 0) - failedDeliveryLossVnd } : {}) };
   }
   async getMediaState() {
@@ -957,7 +957,7 @@ export class CommerceService {
       }
 
       if (awards.length > 0) {
-        await this.db.kpiAwards.create(awards, { session });
+        await this.db.kpiAwards.create(awards, { session, ordered: true });
       }
 
       const result = await this.db.kpiPeriods.updateOne(

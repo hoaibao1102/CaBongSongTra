@@ -312,7 +312,19 @@ export const kpiPeriodSchema = new Schema<KpiPeriod>(
     settlementSnapshot: {
       type: new Schema({
         version: { type: Number, required: true, enum: [1] },
-        policy: { type: kpiPolicySchema, required: true },
+        policy: {
+          type: new Schema({
+            id: { type: String, required: true },
+            name: { type: String, required: true },
+            periodType: { type: String, required: true, enum: ["MONTHLY", "WEEKLY", "CUSTOM"] },
+            metric: { type: String, required: true, enum: ["PRODUCT_QTY", "REVENUE"], default: "PRODUCT_QTY" },
+            tiers: { type: [kpiTierSchema], required: true },
+            active: { type: Boolean, required: true, default: true },
+            createdAt: { type: Date, required: true },
+            updatedAt: { type: Date, required: true },
+          }, { _id: false, strict: "throw", autoIndex: false }),
+          required: true,
+        },
         startDate: { type: Date, required: true }, endDate: { type: Date, required: true },
         members: { type: [new Schema({
           memberId: { type: String, required: true }, displayName: String, email: String, status: String,

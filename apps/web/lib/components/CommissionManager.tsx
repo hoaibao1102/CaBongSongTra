@@ -3,6 +3,7 @@ import { useActorMutation } from "../operation-actor";
 
 import React, { useState, useMemo, useEffect } from "react";
 import {
+  RefreshCw,
   BadgePercent,
   Banknote,
   Wallet,
@@ -133,8 +134,8 @@ export function CommissionManager({
     setKpiLoading(true);
     try {
       const [policiesRes, periodsRes] = await Promise.all([
-        fetch("/api/v1/kpi/policies"),
-        fetch("/api/v1/kpi/periods"),
+        fetch("/api/v1/kpi/policies", { cache: "no-store" }),
+        fetch("/api/v1/kpi/periods", { cache: "no-store" }),
       ]);
       if (policiesRes.ok) {
         const pols: KpiPolicy[] = await policiesRes.json();
@@ -354,8 +355,19 @@ export function CommissionManager({
       setIsPeriodModalOpen(false);
       await fetchKpiData();
     } catch (err: unknown) {
-      if (err instanceof ApiError) setPeriodError(err.message);
-      else setPeriodError("Không thể tạo kỳ KPI.");
+      if (err instanceof ApiError) {
+        if (err.message === "UNIQUE_CONFLICT") {
+          setPeriodError(text(lang, "Kỳ KPI này bị trùng lặp hoặc đã tồn tại.", "This KPI period already exists."));
+        } else if (err.message === "INVALID_DATE_RANGE") {
+          setPeriodError(text(lang, "Khoảng thời gian không hợp lệ (Ngày bắt đầu phải trước ngày kết thúc).", "Invalid date range (Start date must be before end date)."));
+        } else {
+          setPeriodError(err.message);
+        }
+      } else if (err instanceof Error && err.message === "OPERATION_RECONCILIATION_REQUIRED") {
+        setPeriodError(text(lang, "Thao tác trước đó chưa được đồng bộ. Vui lòng bấm thử lại.", "Previous operation is unresolved. Please retry."));
+      } else {
+        setPeriodError(text(lang, "Không thể tạo kỳ KPI.", "Could not create KPI period."));
+      }
     } finally {
       setPeriodSubmitting(false);
     }
@@ -368,7 +380,7 @@ export function CommissionManager({
     setSettleError(null);
     setSettleSuccess(null);
     try {
-      const res = await fetch(`/api/v1/kpi/periods/${p.id}/preview`);
+      const res = await fetch(`/api/v1/kpi/periods/${p.id}/preview`, { cache: "no-store" });
       if (res.ok) {
         setPreviewData(await res.json());
       }
@@ -391,8 +403,19 @@ export function CommissionManager({
       await fetchKpiData();
       await openPreview(previewPeriod);
     } catch (err: unknown) {
-      if (err instanceof ApiError) setSettleError(err.message);
-      else setSettleError("Không thể chốt kỳ KPI.");
+      if (err instanceof ApiError) {
+        if (err.message === "KPI_PERIOD_NOT_CLOSED") {
+          setSettleError(text(lang, "Kỳ KPI này chưa đến thời điểm kết thúc chu kỳ. Vui lòng chờ đến hết kỳ để chốt thưởng.", "This KPI period has not ended yet. Please wait until the period ends to settle."));
+        } else if (err.message === "KPI_PERIOD_ALREADY_SETTLED") {
+          setSettleError(text(lang, "Kỳ KPI này đã được chốt thưởng trước đó rồi.", "This KPI period has already been settled."));
+        } else if (err.message === "UPSTREAM_ERROR") {
+          setSettleError(text(lang, "Máy chủ đang bận hoặc gặp sự cố kết nối. Vui lòng thử lại sau.", "The server encountered an error. Please try again later."));
+        } else {
+          setSettleError(err.message);
+        }
+      } else {
+        setSettleError("Không thể chốt kỳ KPI.");
+      }
     } finally {
       setSettling(false);
     }
@@ -870,7 +893,33 @@ export function CommissionManager({
         title={text(lang, "Tạo lệnh chi trả thu nhập cho CTV", "Create Member Payout")}
       >
         <form onSubmit={handlePayoutSubmit} className="cbst-form">
-          {payoutError && <div className="cbst-form-error">{payoutError}</div>}
+          {payoutError && (
+            <div className="cbst-form-error" style={{ marginBottom: 14 }}>
+              <p style={{ margin: 0 }}>{payoutError}</p>
+              {payoutError.includes("Giao dịch trước chưa rõ kết quả") && (
+                <div style={{ marginTop: 8 }}>
+                  <button
+                    type="button"
+                    className="button secondary"
+                    style={{ fontSize: "0.82rem", padding: "5px 12px", background: "#f8fafc", borderColor: "#cbd5e1", color: "#1e293b", fontWeight: 600, cursor: "pointer" }}
+                    onClick={() => {
+                      try {
+                        for (let i = sessionStorage.length - 1; i >= 0; i--) {
+                          const k = sessionStorage.key(i);
+                          if (k && k.startsWith("cbst-operation-v1:")) {
+                            sessionStorage.removeItem(k);
+                          }
+                        }
+                      } catch {}
+                      setPayoutError(null);
+                    }}
+                  >
+                    {text(lang, "✓ Đã đối soát xong - Bỏ qua dữ liệu chờ để chi trả ngay", "✓ Reconciled - Clear pending operation to proceed")}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           <div style={{ marginBottom: 16 }}>
             <label>
@@ -1152,7 +1201,33 @@ export function CommissionManager({
         title={text(lang, "Mở kỳ đánh giá KPI mới", "Open New KPI Period")}
       >
         <form onSubmit={handleCreatePeriod} className="cbst-form">
-          {periodError && <div className="cbst-form-error">{periodError}</div>}
+          {periodError && (
+            <div className="cbst-form-error" style={{ marginBottom: 14 }}>
+              <p style={{ margin: 0 }}>{periodError}</p>
+              {(periodError.includes("chưa được đồng bộ") || periodError.includes("Giao dịch trước chưa rõ kết quả")) && (
+                <div style={{ marginTop: 8 }}>
+                  <button
+                    type="button"
+                    className="button secondary"
+                    style={{ fontSize: "0.82rem", padding: "5px 12px", background: "#f8fafc", borderColor: "#cbd5e1", color: "#1e293b", fontWeight: 600, cursor: "pointer" }}
+                    onClick={() => {
+                      try {
+                        for (let i = sessionStorage.length - 1; i >= 0; i--) {
+                          const k = sessionStorage.key(i);
+                          if (k && k.startsWith("cbst-operation-v1:")) {
+                            sessionStorage.removeItem(k);
+                          }
+                        }
+                      } catch {}
+                      setPeriodError(null);
+                    }}
+                  >
+                    {text(lang, "✓ Đã đối soát xong - Xóa dữ liệu chờ để tạo kỳ mới", "✓ Reconciled - Clear pending operation to proceed")}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           <div style={{ marginBottom: 16 }}>
             <label>
@@ -1240,6 +1315,19 @@ export function CommissionManager({
                   <strong style={{ fontSize: 18, color: "#16a34a" }}>{money(previewData.totalBonusVnd, lang)}</strong>
                 </div>
                 <div style={{ textAlign: "right" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "flex-end", marginBottom: 4 }}>
+                    <button
+                      type="button"
+                      className="button secondary"
+                      disabled={previewLoading}
+                      onClick={() => previewPeriod && openPreview(previewPeriod)}
+                      style={{ padding: "3px 10px", fontSize: "0.78rem", display: "inline-flex", alignItems: "center", gap: 5 }}
+                      title={text(lang, "Tính toán lại kết quả mới nhất", "Recalculate latest achievements")}
+                    >
+                      <RefreshCw size={12} className={previewLoading ? "cbst-spin" : ""} />
+                      <span>{previewLoading ? text(lang, "Đang tính...", "Calculating...") : text(lang, "Làm mới", "Refresh")}</span>
+                    </button>
+                  </div>
                   <div style={{ fontSize: 12, color: "#64748b" }}>{text(lang, "Trạng thái kỳ", "Period Status")}</div>
                   <strong>{previewData.period.status === "SETTLED" ? text(lang, "Đã chốt & chuyển vào ví", "Settled into wallet") : text(lang, "Đang diễn ra (Chưa chốt)", "In progress (Unsettled)")}</strong>
                 </div>
